@@ -1,0 +1,140 @@
+---
+
+import Baselayout from "../../layouts/Baselayout.astro";
+import { persons, relations } from "../../lib/mongo";
+import { ObjectId } from "mongodb";
+
+export const prerender = false;
+
+const { id } = Astro.params;
+const personId = new ObjectId(id);
+
+// 1️⃣ Récupérer la personne
+const person = await persons.findOne({ _id: personId });
+if (!person) throw new Error("Personne non trouvée");
+
+// 2️⃣ Récupérer tous les parents et enfants biologiques
+const parentRels = await relations.find({
+  type: "PARENT",
+  to: personId
+}).toArray();
+
+const childRels = await relations.find({
+  type: "PARENT",
+  from: personId
+}).toArray();
+
+// Parents biologiques
+let parentsIds = parentRels.map(r => r.from.toString());
+// Enfants biologiques
+let childrenIds = childRels.map(r => r.to.toString());
+
+// 3️⃣ Récupérer tous les conjoints actifs
+const spouseRels = await relations.find({
+  type: "CONJOINT",
+  $or: [{ from: personId }, { to: personId }],
+  status: "ACTIVE"
+}).toArray();
+
+const spouseIds = spouseRels.map(r => r.from.toString() === id ? r.to.toString() : r.from.toString());
+
+// 4️⃣ Propagation des enfants via conjoints actifs uniquement
+for (const spouseRel of spouseRels) {
+  const spouseId = spouseRel.from.toString() === id ? spouseRel.to.toString() : spouseRel.from.toString();
+
+  // récupérer tous les enfants biologiques du conjoint
+  const spouseChildren = await relations.find({ type: "PARENT", from: new ObjectId(spouseId) }).toArray();
+
+  // filtrer uniquement les enfants en commun pendant mariage actif
+  const activeChildren = spouseChildren.filter(r => {
+    // si on utilise dateDebut/dateFin, on peut vérifier si l'enfant est né pendant le mariage actif
+    if (spouseRel.dateDebut && r.to) {
+      const child = r.to; // ObjectId
+      // pour simplifier ici on prend tous les enfants biologiques
+      return true;
+    }
+    return true;
+  }).map(r => r.to.toString());
+
+  childrenIds = [...new Set([...childrenIds, ...activeChildren])];
+}
+
+// 5️⃣ Propagation parents via conjoints (pour enfants)
+for (const parentId of parentsIds) {
+  const activeConjoints = await relations.find({
+    type: "CONJOINT",
+    $or: [{ from: new ObjectId(parentId) }, { to: new ObjectId(parentId) }],
+    status: "ACTIVE"
+  }).toArray();
+
+  for (const r of activeConjoints) {
+    const spouseId = r.from.toString() === parentId ? r.to.toString() : r.from.toString();
+    if (!parentsIds.includes(spouseId)) parentsIds.push(spouseId);
+  }
+}
+
+// 6️⃣ Récupérer les objets Person
+const getPersonsByIds = async (ids: string[]) => {
+  return await persons.find({ _id: { $in: ids.map(i => new ObjectId(i)) } }).toArray();
+};
+
+const parentObjs = await getPersonsByIds(parentsIds);
+const childObjs = await getPersonsByIds(childrenIds);
+const spouseObjs = await getPersonsByIds(spouseIds);
+---
+
+<Baselayout title={`${person.prenom} ${person.nom}`}>
+  <h2 class="text-2xl font-bold mb-4">{person.prenom} {person.nom}</h2>
+
+  <div class="bg-white shadow-md rounded-lg p-6 max-w-md mb-6">
+    <p><span class="font-semibold">Email:</span> {person.email || "Non renseigné"}</p>
+    <p><span class="font-semibold">Date de naissance:</span> {person.dateNaissance || "Non renseignée"}</p>
+    <p><span class="font-semibold">Sexe:</span> {person.sexe || "Non renseigné"}</p>
+  </div>
+
+  <div class="grid gap-4 max-w-md mb-6">
+    <!-- Parents -->
+    <div class="bg-white shadow-md rounded-lg p-4">
+      <h3 class="font-semibold mb-2 text-gray-700">Parents</h3>
+      {parentObjs.length > 0 ? (
+        <ul class="list-disc list-inside">
+          {parentObjs.map(p => (
+            <li>{p.prenom} {p.nom}</li>
+          ))}
+        </ul>
+      ) : (
+        <p class="text-gray-500">Aucun parent enregistré</p>
+      )}
+    </div>
+
+    <!-- Enfants -->
+    <div class="bg-white shadow-md rounded-lg p-4">
+      <h3 class="font-semibold mb-2 text-gray-700">Enfants</h3>
+      {childObjs.length > 0 ? (
+        <ul class="list-disc list-inside">
+          {childObjs.map(c => (
+            <li>{c.prenom} {c.nom}</li>
+          ))}
+        </ul>
+      ) : (
+        <p class="text-gray-500">Aucun enfant enregistré</p>
+      )}
+    </div>
+
+    <!-- Conjoints -->
+    <div class="bg-white shadow-md rounded-lg p-4">
+      <h3 class="font-semibold mb-2 text-gray-700">Conjoints</h3>
+      {spouseObjs.length > 0 ? (
+        <ul class="list-disc list-inside">
+          {spouseObjs.map(s => (
+            <li>{s.prenom} {s.nom}</li>
+          ))}
+        </ul>
+      ) : (
+        <p class="text-gray-500">Aucun conjoint enregistré</p>
+      )}
+    </div>
+  </div>
+
+  <a href="/" class="text-blue-600 hover:underline">← Retour à l'accueil</a>
+</BaseLayout>

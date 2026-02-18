@@ -1,0 +1,134 @@
+---
+const { title = "Arbre généalogique" } = Astro.props;
+import "../styles/global.css"; // <- c'est ici qu'il faut l'import
+
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+
+    <style>
+      :root {
+        --bg: #f7f9fc;
+        --primary: #2c7be5;
+        --secondary: #6c757d;
+        --card: #ffffff;
+        --text: #1f2933;
+        --border: #e5e7eb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      header {
+        background: var(--card);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 1.3rem;
+        color: var(--primary);
+      }
+
+      nav a {
+        margin-left: 1rem;
+        text-decoration: none;
+        color: var(--secondary);
+        font-weight: 500;
+      }
+
+      nav a:hover {
+        color: var(--primary);
+      }
+
+      main {
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 1.5rem;
+        background: var(--card);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      }
+
+      footer {
+        text-align: center;
+        padding: 1.5rem;
+        color: var(--secondary);
+        font-size: 0.9rem;
+      }
+
+      button {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 0.6rem 1.2rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+
+      button:hover {
+        opacity: 0.9;
+      }
+
+      input, select {
+        padding: 0.5rem;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        margin-bottom: 0.8rem;
+        width: 100%;
+      }
+
+      form {
+        max-width: 400px;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border);
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <h1>🌳 Arbre généalogique</h1>
+      <nav>
+        <a href="/">Accueil</a>
+        <a href="/addperson">Ajouter personne + </a>
+        <a href="/addrelation">Ajouter relation + </a>
+        <a href="/relations">Relations</a>
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer>
+      <p>© 2026 - Projet généalogie</p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,94 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Ajouter une personne">
+  <h2 class="text-2xl font-bold mb-6 text-gray-800">Ajouter une personne</h2>
+
+  <form id="form" class="bg-white shadow-md rounded-lg p-6 max-w-md mx-auto space-y-4">
+    <!-- Prénom -->
+    <div class="flex flex-col">
+      <label for="prenom" class="mb-1 font-medium text-gray-700">Prénom</label>
+      <input
+        name="prenom"
+        placeholder="Prénom"
+        required
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+
+    <!-- Nom -->
+    <div class="flex flex-col">
+      <label for="nom" class="mb-1 font-medium text-gray-700">Nom</label>
+      <input
+        name="nom"
+        placeholder="Nom"
+        required
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+
+    <!-- Email -->
+    <div class="flex flex-col">
+      <label for="email" class="mb-1 font-medium text-gray-700">Adresse email</label>
+      <input
+        type="email"
+        name="email"
+        placeholder="Adresse email"
+        
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+
+    <!-- Date de naissance -->
+    <div class="flex flex-col">
+      <label for="dateNaissance" class="mb-1 font-medium text-gray-700">Date de naissance</label>
+      <input
+        type="date"
+        name="dateNaissance"
+        
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+
+    <!-- Sexe -->
+    <div class="flex flex-col">
+      <label for="sexe" class="mb-1 font-medium text-gray-700">Sexe</label>
+      <select
+        name="sexe"
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      >
+        <option value="M">Homme</option>
+        <option value="F">Femme</option>
+        <option value="Autre">Autre</option>
+      </select>
+    </div>
+
+    <!-- Bouton -->
+    <div>
+      <button
+        type="submit"
+        class="w-full bg-blue-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+      >
+        Ajouter
+      </button>
+    </div>
+  </form>
+
+  <script>
+    const form = document.getElementById("form") as HTMLFormElement;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+
+      await fetch("/api/persons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      window.location.href = "/";
+    });
+  </script>
+</BaseLayout>

@@ -1,0 +1,22 @@
+---
+const { relationId } = Astro.props;
+---
+<button
+  class="delete-relation-btn px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+  data-relation-id={relationId}
+>
+  Supprimer
+</button>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.delete-relation-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm("Voulez-vous vraiment supprimer cette relation ?")) return;
+        const relationId = (btn as HTMLElement).dataset.relationId;
+        await fetch(`/api/relations/${relationId}`, { method: 'DELETE' });
+        location.reload();
+      });
+    });
+  });
+</script>
