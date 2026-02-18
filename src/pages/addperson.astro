@@ -1,92 +1,125 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { persons } from "../lib/mongo";
+import { ObjectId } from "mongodb";
+
+export const prerender = false;
+
+const { id } = Astro.url.searchParams ? 
+  { id: Astro.url.searchParams.get("id") } : 
+  { id: null };
+
+let person = null;
+if (id) {
+  person = await persons.findOne({ _id: new ObjectId(id) });
+}
 ---
 
-<BaseLayout title="Ajouter une personne">
-  <h2 class="text-2xl font-bold mb-6 text-gray-800">Ajouter une personne</h2>
+<BaseLayout title={person ? "Modifier une personne" : "Ajouter une personne"}>
+  <h2 class="text-2xl font-bold mb-6 text-gray-800">
+    {person ? `Modifier ${person.prenom} ${person.nom}` : "Ajouter une personne"}
+  </h2>
 
   <form id="form" class="bg-white shadow-md rounded-lg p-6 max-w-md mx-auto space-y-4">
     <!-- Prénom -->
     <div class="flex flex-col">
-      <label for="prenom" class="mb-1 font-medium text-gray-700">Prénom</label>
+      <label class="mb-1 font-medium text-gray-700">Prénom</label>
       <input
         name="prenom"
         placeholder="Prénom"
         required
-        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        value={person?.prenom ?? ""}
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
     </div>
 
     <!-- Nom -->
     <div class="flex flex-col">
-      <label for="nom" class="mb-1 font-medium text-gray-700">Nom</label>
+      <label class="mb-1 font-medium text-gray-700">Nom</label>
       <input
         name="nom"
         placeholder="Nom"
         required
-        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        value={person?.nom ?? ""}
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
     </div>
 
     <!-- Email -->
     <div class="flex flex-col">
-      <label for="email" class="mb-1 font-medium text-gray-700">Adresse email</label>
+      <label class="mb-1 font-medium text-gray-700">Adresse email</label>
       <input
         type="email"
         name="email"
         placeholder="Adresse email"
-        
-        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        value={person?.email ?? ""}
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
     </div>
 
     <!-- Date de naissance -->
     <div class="flex flex-col">
-      <label for="dateNaissance" class="mb-1 font-medium text-gray-700">Date de naissance</label>
+      <label class="mb-1 font-medium text-gray-700">Date de naissance</label>
       <input
         type="date"
         name="dateNaissance"
-        
-        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        value={person?.dateNaissance ?? ""}
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
     </div>
 
     <!-- Sexe -->
     <div class="flex flex-col">
-      <label for="sexe" class="mb-1 font-medium text-gray-700">Sexe</label>
+      <label class="mb-1 font-medium text-gray-700">Sexe</label>
       <select
         name="sexe"
-        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
-        <option value="M">Homme</option>
-        <option value="F">Femme</option>
-        <option value="Autre">Autre</option>
+        <option value="M" selected={person?.sexe === "M"}>Homme</option>
+        <option value="F" selected={person?.sexe === "F"}>Femme</option>
+        <option value="Autre" selected={person?.sexe === "Autre"}>Autre</option>
       </select>
     </div>
 
-    <!-- Bouton -->
-    <div>
-      <button
-        type="submit"
-        class="w-full bg-blue-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+    <button
+      type="submit"
+      class="w-full bg-blue-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+    >
+      {person ? "Enregistrer les modifications" : "Ajouter"}
+    </button>
+
+    {person && (
+      <a
+        href="/"
+        class="block text-center text-sm text-gray-500 hover:underline"
       >
-        Ajouter
-      </button>
-    </div>
+        Annuler
+      </a>
+    )}
   </form>
 
-  <script>
-    const form = document.getElementById("form") as HTMLFormElement;
+  <script define:vars={{ personId: id }}>
+    const form = document.getElementById("form");
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(form));
 
-      await fetch("/api/persons", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      if (personId) {
+        // Mode édition → PATCH
+        await fetch(`/api/persons/${personId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+      } else {
+        // Mode création → POST
+        await fetch("/api/persons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+      }
 
       window.location.href = "/";
     });

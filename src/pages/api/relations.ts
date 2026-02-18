@@ -4,6 +4,10 @@ import { ObjectId } from "mongodb";
 import type { Relation } from "../../models/Relation";
 export const prerender = false;
 
+export const GET: APIRoute = async () => {
+  const data = await relations.find().toArray();
+  return new Response(JSON.stringify(data), { status: 200 });
+};
 
 export const POST: APIRoute = async ({ request }) => {
   const body = await request.json();
