@@ -1,5 +1,6 @@
 ---
-import BaseLayout from "../layouts/BaseLayout.astro";
+
+import Baselayout from "../layouts/Baselayout.astro";
 import { persons } from "../lib/mongo";
 import { ObjectId } from "mongodb";
 
@@ -15,7 +16,7 @@ if (id) {
 }
 ---
 
-<BaseLayout title={person ? "Modifier une personne" : "Ajouter une personne"}>
+<Baselayout title={person ? "Modifier une personne" : "Ajouter une personne"}>
   <h2 class="text-2xl font-bold mb-6 text-gray-800">
     {person ? `Modifier ${person.prenom} ${person.nom}` : "Ajouter une personne"}
   </h2>
@@ -124,4 +125,4 @@ if (id) {
       window.location.href = "/";
     });
   </script>
-</BaseLayout>
+</Baselayout>
