@@ -1,7 +1,7 @@
-import { e as createComponent, m as maybeRenderHead, g as addAttribute, n as renderScript, r as renderTemplate, h as createAstro, k as renderComponent } from '../chunks/astro/server_C_XB61DQ.mjs';
+import { e as createComponent, m as maybeRenderHead, g as addAttribute, n as renderScript, r as renderTemplate, h as createAstro, k as renderComponent } from '../chunks/astro/server_CVCXfxKo.mjs';
 import 'piccolore';
 import 'clsx';
-import { $ as $$Baselayout } from '../chunks/Baselayout_s9RJkwsr.mjs';
+import { $ as $$Baselayout } from '../chunks/Baselayout_CrTDqnb9.mjs';
 import { r as relations, p as persons } from '../chunks/mongo_Dkx7giOQ.mjs';
 import { ObjectId } from 'mongodb';
 export { renderers } from '../renderers.mjs';

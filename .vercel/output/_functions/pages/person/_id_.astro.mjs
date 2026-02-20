@@ -1,6 +1,6 @@
-import { e as createComponent, k as renderComponent, r as renderTemplate, h as createAstro, m as maybeRenderHead, g as addAttribute, o as Fragment } from '../../chunks/astro/server_C_XB61DQ.mjs';
+import { e as createComponent, k as renderComponent, r as renderTemplate, h as createAstro, m as maybeRenderHead, g as addAttribute, o as Fragment } from '../../chunks/astro/server_CVCXfxKo.mjs';
 import 'piccolore';
-import { $ as $$Baselayout } from '../../chunks/Baselayout_s9RJkwsr.mjs';
+import { $ as $$Baselayout } from '../../chunks/Baselayout_CrTDqnb9.mjs';
 import { p as persons, r as relations } from '../../chunks/mongo_Dkx7giOQ.mjs';
 import { ObjectId } from 'mongodb';
 export { renderers } from '../../renderers.mjs';
