@@ -17,8 +17,9 @@ export const POST: APIRoute = async ({ request }) => {
     active:true,
     prenom: body.prenom.trim().toLowerCase(),
     nom: body.nom.trim().toLowerCase(),
-    email:body.email.trim().toLowerCase(),
+    email:body.email?.trim().toLowerCase(),
     dateNaissance: body.dateNaissance.trim().toLowerCase(),
+    dateDeces: body.dateDeces?.trim().toLowerCase(),
     sexe: body.sexe,
   };
 

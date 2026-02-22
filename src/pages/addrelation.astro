@@ -3,6 +3,7 @@ import Baselayout from "../layouts/Baselayout.astro";
 import { persons as personsCol, relations as relationsCol } from "../lib/mongo";
 import { ObjectId } from "mongodb";
 import { formatDateForInput } from "../utils/formatDate.ts";
+import { formatFullName } from "../utils/formatName.ts";
 
 export const prerender = false;
 
@@ -30,16 +31,19 @@ function isMajeur(dateNaissance?: string): boolean {
 }
 
 // Mapper persons
-const personsData = persons.map((p) => ({
-  _id: p._id!.toString(),
-  prenom: p.prenom,
-  nom: p.nom,
-  sexe: p.sexe,
-  dateNaissance: p.dateNaissance,
-  majeur: isMajeur(p.dateNaissance),
-}));
+const personsData = persons
+  .map((p) => ({
+    _id: p._id!.toString(),
+    prenom: p.prenom,
+    nom: p.nom,
+    sexe: p.sexe,
+    dateNaissance: p.dateNaissance,
+    majeur: isMajeur(p.dateNaissance),
+  }))
+  .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 
 const majeurs = personsData.filter((p) => p.majeur);
+// majeurs est déjà trié car il découle de personsData
 
 const coupleRelationsData = coupleRelations.map((r) => {
   const p1 = personsData.find((p) => p._id === r.from.toString());
@@ -48,10 +52,11 @@ const coupleRelationsData = coupleRelations.map((r) => {
     _id: r._id!.toString(),
     label:
       p1 && p2
-        ? `${p1.prenom} ${p1.nom} & ${p2.prenom} ${p2.nom}${r.status === "DIVORCED" ? " (divorcés)" : ""}`
+        ? `${formatFullName(p1.prenom, p1.nom)} & ${formatFullName(p2.prenom, p2.nom)}${r.status === "DIVORCED" ? " (divorcés)" : ""}`
         : r._id!.toString(),
   };
 });
+const currentCoupleRelationId = relation?.coupleRelationId?.toString() ?? "";
 ---
 
 <Baselayout title={relation ? "Modifier une relation" : "Ajouter une relation"}>
@@ -94,6 +99,28 @@ const coupleRelationsData = coupleRelations.map((r) => {
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label class="block text-sm font-medium text-gray-600 mb-1">
+                Couple associé (optionnel)
+              </label>
+              <select
+                name="coupleRelationId"
+                id="coupleRelationId"
+                class="w-full rounded-lg border-gray-300"
+              >
+                <option value="">— Aucun couple —</option>
+                {
+                  coupleRelationsData.map((c) => (
+                    <option
+                      value={c._id}
+                      selected={currentCoupleRelationId === c._id}
+                    >
+                      {c.label}
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+            <div>
               <label class="block text-sm font-medium text-gray-600 mb-1"
                 >Enfant</label
               >
@@ -108,7 +135,7 @@ const coupleRelationsData = coupleRelations.map((r) => {
                       value={p._id}
                       selected={relation?.to?.toString() === p._id}
                     >
-                      {p.prenom} {p.nom}
+                      {formatFullName(p.prenom, p.nom)}
                     </option>
                   ))
                 }
@@ -131,13 +158,12 @@ const coupleRelationsData = coupleRelations.map((r) => {
                       value={p._id}
                       selected={relation?.from?.toString() === p._id}
                     >
-                      {p.prenom} {p.nom}
+                      {formatFullName(p.prenom, p.nom)}
                     </option>
                   ))
                 }
               </select>
             </div>
-            
           </div>
         </div>
       </div>
@@ -167,7 +193,7 @@ const coupleRelationsData = coupleRelations.map((r) => {
                       value={p._id}
                       selected={relation?.from?.toString() === p._id}
                     >
-                      {p.prenom} {p.nom}
+                      {formatFullName(p.prenom, p.nom)}
                     </option>
                   ))
                 }
@@ -189,7 +215,7 @@ const coupleRelationsData = coupleRelations.map((r) => {
                       value={p._id}
                       selected={relation?.to?.toString() === p._id}
                     >
-                      {p.prenom} {p.nom}
+                      {formatFullName(p.prenom, p.nom)}
                     </option>
                   ))
                 }
@@ -293,6 +319,10 @@ const coupleRelationsData = coupleRelations.map((r) => {
       let payload = {};
 
       if (type === "CONJOINT") {
+        if (fd.get("from") === fd.get("to")) {
+          alert("Les deux conjoints ne peuvent pas être la même personne.");
+          return;
+        }
         payload = {
           type,
           from: fd.get("from"),
@@ -300,14 +330,20 @@ const coupleRelationsData = coupleRelations.map((r) => {
           status: fd.get("status"),
           dateDebut: fd.get("dateDebut") ? new Date(fd.get("dateDebut")) : null,
           dateFin: fd.get("dateFin") ? new Date(fd.get("dateFin")) : null,
-          
         };
       } else {
+        if (fd.get("parent1") === fd.get("child")) {
+          alert("Le parent et l'enfant ne peuvent pas être la même personne.");
+          return;
+        }
         payload = {
           type: "PARENT",
-          status:fd.get("status"),
+          status: fd.get("status"),
           from: fd.get("parent1"),
           to: fd.get("child"),
+          ...(fd.get("coupleRelationId")
+            ? { coupleRelationId: fd.get("coupleRelationId") }
+            : {}),
         };
       }
 

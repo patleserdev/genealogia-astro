@@ -1,7 +1,6 @@
 ---
 const { title = "Arbre généalogique" } = Astro.props;
-import "../styles/global.css"; // <- c'est ici qu'il faut l'import
-
+import "../styles/global.css";
 ---
 
 <!DOCTYPE html>
@@ -21,9 +20,7 @@ import "../styles/global.css"; // <- c'est ici qu'il faut l'import
         --border: #e5e7eb;
       }
 
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
 
       body {
         margin: 0;
@@ -32,39 +29,130 @@ import "../styles/global.css"; // <- c'est ici qu'il faut l'import
         color: var(--text);
       }
 
+      /* HEADER */
       header {
         background: var(--card);
         border-bottom: 1px solid var(--border);
-        padding: 1rem 2rem;
+        padding: 0 2rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        height: 60px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
       }
 
       header h1 {
         margin: 0;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         color: var(--primary);
+        white-space: nowrap;
+      }
+
+      /* NAV DESKTOP */
+      nav {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
       }
 
       nav a {
-        margin-left: 1rem;
         text-decoration: none;
         color: var(--secondary);
         font-weight: 500;
+        font-size: 0.9rem;
+        padding: 0.4rem 0.75rem;
+        border-radius: 8px;
+        transition: background 0.15s, color 0.15s;
+        white-space: nowrap;
       }
 
       nav a:hover {
         color: var(--primary);
+        background: #f0f5ff;
       }
 
+      nav a.active {
+        color: var(--primary);
+        background: #e8f0fe;
+        font-weight: 600;
+      }
+
+      /* BURGER */
+      .burger {
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        gap: 5px;
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        border-radius: 8px;
+      }
+
+      .burger span {
+        display: block;
+        width: 22px;
+        height: 2px;
+        background: var(--text);
+        border-radius: 2px;
+        transition: all 0.25s;
+      }
+
+      .burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+      .burger.open span:nth-child(2) { opacity: 0; }
+      .burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+      /* MOBILE MENU */
+      .mobile-menu {
+        display: none;
+        flex-direction: column;
+        background: var(--card);
+        border-bottom: 1px solid var(--border);
+        padding: 0.75rem 1rem;
+        gap: 0.25rem;
+      }
+
+      .mobile-menu.open {
+        display: flex;
+      }
+
+      .mobile-menu a {
+        text-decoration: none;
+        color: var(--secondary);
+        font-weight: 500;
+        font-size: 0.95rem;
+        padding: 0.6rem 0.75rem;
+        border-radius: 8px;
+        transition: background 0.15s, color 0.15s;
+      }
+
+      .mobile-menu a:hover,
+      .mobile-menu a.active {
+        color: var(--primary);
+        background: #f0f5ff;
+      }
+
+      @media (max-width: 768px) {
+        nav { display: none; }
+        .burger { display: flex; }
+        header { padding: 0 1rem; }
+      }
+
+      /* MAIN */
       main {
-        max-width: 900px;
+        max-width: 960px;
         margin: 2rem auto;
         padding: 1.5rem;
         background: var(--card);
         border-radius: 12px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      }
+
+      @media (max-width: 768px) {
+        main { margin: 1rem; padding: 1rem; }
       }
 
       footer {
@@ -84,9 +172,7 @@ import "../styles/global.css"; // <- c'est ici qu'il faut l'import
         font-size: 0.9rem;
       }
 
-      button:hover {
-        opacity: 0.9;
-      }
+      button:hover { opacity: 0.9; }
 
       input, select {
         padding: 0.5rem;
@@ -96,14 +182,9 @@ import "../styles/global.css"; // <- c'est ici qu'il faut l'import
         width: 100%;
       }
 
-      form {
-        max-width: 400px;
-      }
+      form { max-width: 400px; }
 
-      ul {
-        list-style: none;
-        padding: 0;
-      }
+      ul { list-style: none; padding: 0; }
 
       li {
         padding: 0.5rem 0;
@@ -115,13 +196,32 @@ import "../styles/global.css"; // <- c'est ici qu'il faut l'import
   <body>
     <header>
       <h1>🌳 Arbre généalogique</h1>
-      <nav>
+
+      <!-- Desktop nav -->
+      <nav id="desktopNav">
         <a href="/">Accueil</a>
-        <a href="/persons">Liste des personnes</a>
- 
-        <a href="/relations">Liste des relations</a>
+        <a href="/persons">Personnes</a>
+        <a href="/relations">Relations</a>
+        <a href="/addrelation-quick">Relation rapide</a>
+        <a href="/addperson-with-relations">Personne + Relation</a>
       </nav>
+
+      <!-- Burger -->
+      <button class="burger" id="burger" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
     </header>
+
+    <!-- Mobile menu -->
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="/">Accueil</a>
+      <a href="/persons">Personnes</a>
+      <a href="/relations">Relations</a>
+      <a href="/addrelation-quick">Relation rapide</a>
+      <a href="/addperson-with-relations">Personne + Relation</a>
+    </div>
 
     <main>
       <slot />
@@ -130,5 +230,32 @@ import "../styles/global.css"; // <- c'est ici qu'il faut l'import
     <footer>
       <p>© 2026 - Projet généalogie</p>
     </footer>
+
+    <script>
+      // Burger toggle
+      const burger = document.getElementById("burger");
+      const mobileMenu = document.getElementById("mobileMenu");
+
+      burger.addEventListener("click", () => {
+        burger.classList.toggle("open");
+        mobileMenu.classList.toggle("open");
+      });
+
+      // Fermer le menu au clic sur un lien
+      mobileMenu.querySelectorAll("a").forEach(a => {
+        a.addEventListener("click", () => {
+          burger.classList.remove("open");
+          mobileMenu.classList.remove("open");
+        });
+      });
+
+      // Lien actif
+      const currentPath = window.location.pathname;
+      document.querySelectorAll("nav a, .mobile-menu a").forEach(a => {
+        if (a.getAttribute("href") === currentPath) {
+          a.classList.add("active");
+        }
+      });
+    </script>
   </body>
 </html>

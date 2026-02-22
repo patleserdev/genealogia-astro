@@ -14,15 +14,20 @@ export const POST: APIRoute = async ({ request }) => {
 
   // Vérification : from et to ne doivent pas être identiques
   if (body.from === body.to) {
-    return new Response(JSON.stringify({ error: "Une personne ne peut pas avoir de relation avec elle-même." }), {
-      status: 400,
-    });
+    return new Response(
+      JSON.stringify({ error: "Une personne ne peut pas avoir une relation avec elle-même." }),
+      { status: 400 }
+    );
   }
-  
+
   const newRelation: Relation = {
     from: new ObjectId(body.from),
     to: new ObjectId(body.to),
-    type: body.type
+    type: body.type,
+    status: body.status,
+    dateDebut: body.dateDebut ?? undefined,
+    dateFin: body.dateFin ?? undefined,
+    ...(body.coupleRelationId ? { coupleRelationId: new ObjectId(body.coupleRelationId) } : {}),
   };
 
   await relations.insertOne(newRelation);

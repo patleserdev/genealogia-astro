@@ -3,6 +3,7 @@ import Baselayout from "../../layouts/Baselayout.astro";
 import { persons, relations } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 import { formatFullName } from "../../utils/formatName.ts";
+import { formatDateFR } from "../../utils/formatDate.ts";
 
 export const prerender = false;
 
@@ -22,7 +23,6 @@ const allSpouseRels = await relations.find({
   ]
 }).toArray();
 
-console.log("allSpouseRels",allSpouseRels)
 // 3. Récupérer toutes les relations PARENT où cette personne est enfant
 const parentRels = await relations.find({
   type: "PARENT",
@@ -80,11 +80,51 @@ const orphanChildren = orphanChildRels.length > 0
     }).toArray()
   : [];
 
-// 7. Parents
+// 7. Parents directs (relations PARENT où cette personne est enfant)
+
 const parentIds = parentRels.map(r => typeof r.from === "string" ? new ObjectId(r.from) : r.from);
+
+// Récupérer aussi les seconds parents via coupleRelationId
+for (const rel of parentRels) {
+  if (rel.coupleRelationId) {
+    const coupleRel = await relations.findOne({ _id: rel.coupleRelationId });
+    if (coupleRel) {
+      const fromId = typeof coupleRel.from === "string" ? new ObjectId(coupleRel.from) : coupleRel.from;
+      const toId = typeof coupleRel.to === "string" ? new ObjectId(coupleRel.to) : coupleRel.to;
+      // Ajouter l'autre parent s'il n'est pas déjà dans la liste
+      const otherParentId = fromId.equals(parentIds[0]) ? toId : fromId;
+      if (!parentIds.some(id => id.equals(otherParentId))) {
+        parentIds.push(otherParentId);
+      }
+    }
+  }
+}
+
 const parentObjs = parentIds.length > 0
   ? await persons.find({ _id: { $in: parentIds } }).toArray()
   : [];
+
+  // 8. Frères et sœurs
+const siblings: any[] = [];
+
+for (const rel of parentRels) {
+  if (rel.coupleRelationId) {
+    // Tous les enfants du même couple
+    const siblingRels = await relations.find({
+      type: "PARENT",
+      coupleRelationId: rel.coupleRelationId,
+      to: { $ne: personId } // exclure la personne elle-même
+    }).toArray();
+
+    for (const sibRel of siblingRels) {
+      const sibId = typeof sibRel.to === "string" ? new ObjectId(sibRel.to) : sibRel.to;
+      if (!siblings.some(s => s._id.equals(sibId))) {
+        const sibPerson = await persons.findOne({ _id: sibId });
+        if (sibPerson) siblings.push(sibPerson);
+      }
+    }
+  }
+}
 ---
 
 <Baselayout title={`${formatFullName(person.prenom, person.nom)}`}>
@@ -93,8 +133,8 @@ const parentObjs = parentIds.length > 0
   <!-- Infos personnelles -->
   <div class="bg-white shadow-md rounded-lg p-6 max-w-lg mb-6">
     <p><span class="font-semibold">Email :</span> {person.email || "Non renseigné"}</p>
-    <p><span class="font-semibold">Date de naissance :</span> {person.dateNaissance || "Non renseignée"}</p>
-    {person.dateDeces && <p><span class="font-semibold">Date de décès :</span> {person.dateDeces}</p>}
+    <p><span class="font-semibold">Date de naissance :</span> {formatDateFR(person.dateNaissance) || "Non renseignée"}</p>
+    {person.dateDeces && <p><span class="font-semibold">Date de décès :</span> {formatDateFR(person.dateDeces)}</p>}
     <p><span class="font-semibold">Sexe :</span> {person.sexe || "Non renseigné"}</p>
     {person.notes && <p class="mt-2 text-gray-600 italic">{person.notes}</p>}
     <a
@@ -114,7 +154,7 @@ const parentObjs = parentIds.length > 0
         <ul class="space-y-1">
           {parentObjs.map(p => (
             <li>
-              <a href={`/persons/${p._id}`} class="text-blue-600 hover:underline">
+              <a href={`/person/${p._id}`} class="text-blue-600 hover:underline">
                 {formatFullName(p.prenom,p.nom)}
               </a>
             </li>
@@ -124,6 +164,27 @@ const parentObjs = parentIds.length > 0
         <p class="text-gray-400">Aucun parent enregistré</p>
       )}
     </div>
+
+    <!-- Frères et sœurs -->
+<div class="bg-white shadow-md rounded-lg p-4">
+  <h3 class="font-semibold mb-2 text-gray-700 text-lg">Frères & Sœurs</h3>
+  {siblings.length > 0 ? (
+    <ul class="space-y-1">
+      {siblings.map(s => (
+        <li>
+          <a href={`/person/${s._id}`} class="text-blue-600 hover:underline">
+            {formatFullName(s.prenom, s.nom)}
+          </a>
+          {s.dateNaissance && (
+            <span class="text-gray-400 text-xs ml-2">({formatDateFR(s.dateNaissance)})</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p class="text-gray-400">Aucun frère ou sœur enregistré</p>
+  )}
+</div>
 
     <!-- Conjoints & ex-conjoints avec leurs enfants -->
     <div class="bg-white shadow-md rounded-lg p-4">
@@ -138,7 +199,7 @@ const parentObjs = parentIds.length > 0
                   {entry.status === 'ACTIVE' ? 'Conjoint(e)' : 'Ex-conjoint(e)'}
                 </span>
                 {entry.spousePerson ? (
-                  <a href={`/persons/${entry.spousePerson._id}`} class="font-medium text-blue-600 hover:underline">
+                  <a href={`/person/${entry.spousePerson._id}`} class="font-medium text-blue-600 hover:underline">
                     {formatFullName(entry.spousePerson.prenom, entry.spousePerson.nom)}
                   </a>
                 ) : (
@@ -148,8 +209,8 @@ const parentObjs = parentIds.length > 0
 
               {(entry.dateDebut || entry.dateFin) && (
                 <p class="text-xs text-gray-500 mb-2">
-                  {entry.dateDebut && <>Depuis le {entry.dateDebut}</>}
-                  {entry.dateFin && <> — jusqu'au {entry.dateFin}</>}
+                  {entry.dateDebut && <>Depuis le {formatDateFR(entry.dateDebut)}</>}
+                  {entry.dateFin && <> — jusqu'au {formatDateFR(entry.dateFin)}</>}
                 </p>
               )}
 
@@ -162,7 +223,7 @@ const parentObjs = parentIds.length > 0
                     {entry.children.map(c => (
                       <li class="flex items-center gap-1 text-sm">
                         <span class="text-gray-400">↳</span>
-                        <a href={`/persons/${c._id}`} class="text-blue-600 hover:underline">
+                        <a href={`/person/${c._id}`} class="text-blue-600 hover:underline">
                           {formatFullName(c.prenom,c.nom)}
                         </a>
                         {c.dateNaissance && (
@@ -190,11 +251,11 @@ const parentObjs = parentIds.length > 0
         <ul class="space-y-1">
           {orphanChildren.map(c => (
             <li>
-              <a href={`/persons/${c._id}`} class="text-blue-600 hover:underline">
+              <a href={`/person/${c._id}`} class="text-blue-600 hover:underline">
                 {formatFullName(c.prenom,c.nom)}
               </a>
               {c.dateNaissance && (
-                <span class="text-gray-400 text-xs ml-2">({c.dateNaissance})</span>
+                <span class="text-gray-400 text-xs ml-2">({formatDateFR(c.dateNaissance)})</span>
               )}
             </li>
           ))}

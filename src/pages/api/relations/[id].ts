@@ -8,12 +8,21 @@ export const PATCH: APIRoute = async ({ request, params }) => {
   const body = await request.json();
   const { status } = body;
 
+  if (body.from === body.to) {
+    return new Response(
+      JSON.stringify({ error: "Une personne ne peut pas avoir une relation avec elle-même." }),
+      { status: 400 }
+    );
+  }
+  
   const payload = {
-    ...body,
     from: new ObjectId(body.from),
     to: new ObjectId(body.to),
-    dateDebut: body.dateDebut ? new Date(body.dateDebut) : null,
-    dateFin: body.dateFin ? new Date(body.dateFin) : null,
+    type: body.type,
+    status: body.status,
+    dateDebut: body.dateDebut ?? undefined,
+    dateFin: body.dateFin ?? undefined,
+    ...(body.coupleRelationId ? { coupleRelationId: new ObjectId(body.coupleRelationId) } : {}),
   };
   await relations.updateOne(
     { _id: new ObjectId(params.id) },

@@ -13,6 +13,8 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     if (body.nom) update.nom = body.nom.trim().toLowerCase();
     if (body.email !== undefined) update.email = body.email.trim().toLowerCase();
     if (body.dateNaissance !== undefined) update.dateNaissance = body.dateNaissance;
+    if (body.dateDeces !== undefined) update.dateDeces = body.dateDeces;
+
     if (body.sexe) update.sexe = body.sexe;
   
     const result = await persons.updateOne(

@@ -1,11 +1,16 @@
 ---
-const { relationId } = Astro.props;
+const { id, type,title } = Astro.props;
+
+const isDisabled=type ? false:true
+const isDisabledStyle="opacity-50 cursor-not-allowed"
 ---
+
 <button
-  class="delete-relation-btn px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-  data-relation-id={relationId}
+  class=`delete-${type}-btn px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 ${isDisabled ? isDisabledStyle : ""}`
+  data-id={id}
+  disabled={isDisabled}
 >
-  Supprimer
+  Supprimer 
 </button>
 
 <script>
@@ -13,8 +18,17 @@ const { relationId } = Astro.props;
     document.querySelectorAll('.delete-relation-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm("Voulez-vous vraiment supprimer cette relation ?")) return;
-        const relationId = (btn as HTMLElement).dataset.relationId;
+        const relationId = (btn as HTMLElement).dataset.id;
         await fetch(`/api/relations/${relationId}`, { method: 'DELETE' });
+        location.reload();
+      });
+    });
+
+    document.querySelectorAll('.delete-person-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm("Voulez-vous vraiment supprimer cette personne ?")) return;
+        const personId = (btn as HTMLElement).dataset.id;
+        await fetch(`/api/persons/${personId}`, { method: 'DELETE' });
         location.reload();
       });
     });

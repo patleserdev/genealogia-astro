@@ -1,4 +1,5 @@
 ---
+import DeleteButton from "../components/DeleteButton.astro";
 import Baselayout from "../layouts/Baselayout.astro";
 import { persons } from "../lib/mongo";
 import { formatDateFR } from "../utils/formatDate";
@@ -19,7 +20,8 @@ const personsList = data.map((p) => ({
     <div class="action mb-4"><a class="border rounded-md p-2" href="/addperson">Ajouter personne + </a></div>
     <div class="grid gap-4">
         {
-            personsList.map((p) => (
+            personsList .sort((a, b) => a.nom.localeCompare(b.nom, "fr"))
+            .map((p) => (
                 <div class="bg-white shadow-md rounded-lg p-4 flex justify-between items-center">
                     <div>
                         <p class="font-semibold text-gray-800 capitalize">
@@ -35,7 +37,7 @@ const personsList = data.map((p) => ({
                         )}
                     </div>
 
-                    <div class="flex gap-2 items-center">
+                    <div class="p-2 flex flex-row items-center justify-center gap-4 actions">
                         <a
                             href={`/person/${p._id}`}
                             class="text-blue-600 hover:underline text-sm font-medium"
@@ -49,14 +51,7 @@ const personsList = data.map((p) => ({
                         >
                             Modifier
                         </a>
-
-                        <button
-                            data-id={p._id}
-                            data-nom={`${p.prenom} ${p.nom}`}
-                            class="delete-btn bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 text-sm font-medium transition-colors"
-                        >
-                            Supprimer
-                        </button>
+                        <DeleteButton type="person" id={p._id} />
                     </div>
                 </div>
             ))

@@ -1,76 +1,134 @@
 ---
 import DeleteButton from "../components/DeleteButton.astro";
 import Baselayout from "../layouts/Baselayout.astro";
-
 import { relations, persons } from "../lib/mongo";
 import { ObjectId } from "mongodb";
 import { formatFullName } from "../utils/formatName";
+import { formatDateFR } from "../utils/formatDate.ts";
 export const prerender = false;
 
-// Récupérer toutes les relations
 const allRelations = await relations.find({}).toArray();
 
-// Récupérer tous les IDs de personnes
 const personIds = Array.from(
-    new Set(allRelations.flatMap((r) => [r.from.toString(), r.to.toString()])),
+  new Set(allRelations.flatMap((r) => [r.from.toString(), r.to.toString()]))
 );
 const personsObjs = await persons
-    .find({ _id: { $in: personIds.map((id) => new ObjectId(id)) } })
-    .toArray();
+  .find({ _id: { $in: personIds.map((id) => new ObjectId(id)) } })
+  .toArray();
 const personsMap = Object.fromEntries(
-    personsObjs.map((p) => [p._id.toString(), p]),
+  personsObjs.map((p) => [p._id.toString(), p])
 );
+
+const conjointRels = allRelations.filter((r) => r.type === "CONJOINT");
+const parentRels = allRelations.filter((r) => r.type === "PARENT");
 ---
 
 <Baselayout title="Toutes les relations">
-    <h2 class="text-2xl font-bold mb-4">Liste des relations</h2>
-    <div class="action mb-4">
-        <a class="border rounded-md p-2" href="/addrelation"
-            >Ajouter une relation +
-        </a>
+  <div class="max-w-6xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-gray-800">Liste des relations</h2>
+      <a
+        href="/addrelation"
+        class="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-blue-700 transition"
+      >
+        ➕ Ajouter une relation
+      </a>
     </div>
-    <table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-        <thead class="bg-gray-100 border-b">
-            <tr>
-                <th class="p-2 text-left">Type</th>
-                <th class="p-2 text-left">De</th>
-                <th class="p-2 text-left">Vers</th>
-                <th class="p-2 text-left">Statut</th>
-                <th class="p-2 text-left">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {
-                allRelations.map((r) => (
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="p-2 border-1 p-1 bg-green-200">{r.type}</td>
-                        <td class="p-2">
-                            {formatFullName(
-                                personsMap[r.from.toString()]?.prenom,
-                                personsMap[r.from.toString()]?.nom,
-                            )}
-                        </td>
-                        <td class="p-2">
-                            {formatFullName(
-                                personsMap[r.to.toString()]?.prenom,
-                                personsMap[r.to.toString()]?.nom,
-                            )}
-                        </td>
 
-                        <td class="p-2">{r.status || "—"}</td>
-                        <td class="p-2 flex gap-2">
-                            <a
-                                href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
-                                class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                            >
-                                ✏️ Modifier
-                            </a>
-
-                            <DeleteButton relationId={r._id} />
-                        </td>
-                    </tr>
-                ))
-            }
-        </tbody>
-    </table>
+   <!-- CONJOINTS -->
+<section class="mb-8">
+    <h3 class="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-3">
+      💍 Couples ({conjointRels.length})
+    </h3>
+    <div class="flex flex-col gap-3">
+      {conjointRels.map((r) => {
+        const from = personsMap[r.from.toString()];
+        const to = personsMap[r.to.toString()];
+        return (
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+            <!-- Statut -->
+            <span class={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${r.status === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+              {r.status === "ACTIVE" ? "✅ En couple" : "❌ Divorcé"}
+            </span>
+  
+            <!-- Noms -->
+            <div class="flex items-center gap-2 flex-1 font-medium text-gray-800">
+              <a href={`/person/${from?._id}`} class="hover:underline text-blue-600">
+                {formatFullName(from?.prenom, from?.nom)}
+              </a>
+              <span class="text-gray-300">↔</span>
+              <a href={`/person/${to?._id}`} class="hover:underline text-blue-600">
+                {formatFullName(to?.prenom, to?.nom)}
+              </a>
+            </div>
+  
+            <!-- Dates -->
+            {(r.dateDebut || r.dateFin) && (
+              <p class="text-xs text-gray-400 whitespace-nowrap">
+                {r.dateDebut && <>Depuis {formatDateFR(r.dateDebut)}</>}
+                {r.dateFin && <> — {formatDateFR(r.dateFin)}</>}
+              </p>
+            )}
+  
+            <!-- Actions -->
+            <div class="flex gap-3 sm:ml-auto">
+              <a
+                href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
+                class="text-amber-600 hover:underline text-sm font-medium"
+              >
+                ✏️ Modifier
+              </a>
+              <DeleteButton type="relation" id={r._id} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+  
+  <!-- PARENTS -->
+  <section>
+    <h3 class="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-3">
+      👨‍👧 Relations parent / enfant ({parentRels.length})
+    </h3>
+    <div class="flex flex-col gap-3">
+      {parentRels.map((r) => {
+        const from = personsMap[r.from.toString()];
+        const to = personsMap[r.to.toString()];
+        return (
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+            <!-- Parent -->
+            <div class="flex items-center gap-1">
+              <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Parent</span>
+              <a href={`/person/${from?._id}`} class="font-medium text-blue-600 hover:underline">
+                {formatFullName(from?.prenom, from?.nom)}
+              </a>
+            </div>
+  
+            <span class="text-gray-300 hidden sm:inline">→</span>
+  
+            <!-- Enfant -->
+            <div class="flex items-center gap-1 flex-1">
+              <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Enfant</span>
+              <a href={`/person/${to?._id}`} class="font-medium text-blue-600 hover:underline">
+                {formatFullName(to?.prenom, to?.nom)}
+              </a>
+            </div>
+  
+            <!-- Actions -->
+            <div class="flex gap-3 sm:ml-auto">
+              <a
+                href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
+                class="text-amber-600 hover:underline text-sm font-medium"
+              >
+                ✏️ Modifier
+              </a>
+              <DeleteButton type="relation" id={r._id} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+  </div>
 </Baselayout>
