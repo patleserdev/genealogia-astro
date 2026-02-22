@@ -1,9 +1,13 @@
 ---
+// Baselayout.astro
 const { title = "Arbre généalogique" } = Astro.props;
 import "../styles/global.css";
+import { getUser } from "../lib/session";
+
+const user = getUser(Astro);
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
@@ -20,11 +24,18 @@ import "../styles/global.css";
         --border: #e5e7eb;
       }
 
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
 
       body {
         margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
         background: var(--bg);
         color: var(--text);
       }
@@ -64,7 +75,9 @@ import "../styles/global.css";
         font-size: 0.9rem;
         padding: 0.4rem 0.75rem;
         border-radius: 8px;
-        transition: background 0.15s, color 0.15s;
+        transition:
+          background 0.15s,
+          color 0.15s;
         white-space: nowrap;
       }
 
@@ -101,9 +114,15 @@ import "../styles/global.css";
         transition: all 0.25s;
       }
 
-      .burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-      .burger.open span:nth-child(2) { opacity: 0; }
-      .burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+      .burger.open span:nth-child(1) {
+        transform: translateY(7px) rotate(45deg);
+      }
+      .burger.open span:nth-child(2) {
+        opacity: 0;
+      }
+      .burger.open span:nth-child(3) {
+        transform: translateY(-7px) rotate(-45deg);
+      }
 
       /* MOBILE MENU */
       .mobile-menu {
@@ -126,7 +145,9 @@ import "../styles/global.css";
         font-size: 0.95rem;
         padding: 0.6rem 0.75rem;
         border-radius: 8px;
-        transition: background 0.15s, color 0.15s;
+        transition:
+          background 0.15s,
+          color 0.15s;
       }
 
       .mobile-menu a:hover,
@@ -136,9 +157,15 @@ import "../styles/global.css";
       }
 
       @media (max-width: 768px) {
-        nav { display: none; }
-        .burger { display: flex; }
-        header { padding: 0 1rem; }
+        nav {
+          display: none;
+        }
+        .burger {
+          display: flex;
+        }
+        header {
+          padding: 0 1rem;
+        }
       }
 
       /* MAIN */
@@ -148,11 +175,14 @@ import "../styles/global.css";
         padding: 1.5rem;
         background: var(--card);
         border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
       }
 
       @media (max-width: 768px) {
-        main { margin: 1rem; padding: 1rem; }
+        main {
+          margin: 1rem;
+          padding: 1rem;
+        }
       }
 
       footer {
@@ -172,9 +202,12 @@ import "../styles/global.css";
         font-size: 0.9rem;
       }
 
-      button:hover { opacity: 0.9; }
+      button:hover {
+        opacity: 0.9;
+      }
 
-      input, select {
+      input,
+      select {
         padding: 0.5rem;
         border-radius: 6px;
         border: 1px solid var(--border);
@@ -182,9 +215,14 @@ import "../styles/global.css";
         width: 100%;
       }
 
-      form { max-width: 400px; }
+      form {
+        max-width: 400px;
+      }
 
-      ul { list-style: none; padding: 0; }
+      ul {
+        list-style: none;
+        padding: 0;
+      }
 
       li {
         padding: 0.5rem 0;
@@ -204,6 +242,23 @@ import "../styles/global.css";
         <a href="/relations">Relations</a>
         <a href="/addrelation-quick">Relation rapide</a>
         <a href="/addperson-with-relations">Personne + Relation</a>
+        {
+          user ? (
+            <div class="user-menu">
+              <span class="user-icon" title={user.name}>
+                👤 {user.name}
+              </span>
+              <a href="/api/auth/logout" class="logout">
+                Déconnexion
+              </a>
+            </div>
+          ) : (
+            <>
+              <a href="/login">Se connecter</a>
+              <a href="/signup">S'inscrire</a>
+            </>
+          )
+        }
       </nav>
 
       <!-- Burger -->
@@ -221,6 +276,23 @@ import "../styles/global.css";
       <a href="/relations">Relations</a>
       <a href="/addrelation-quick">Relation rapide</a>
       <a href="/addperson-with-relations">Personne + Relation</a>
+      {
+        user ? (
+          <div class="user-menu md:ml-8">
+            <span class="user-icon" title={user.name}>
+              👤 {user.name}
+            </span>
+            <a href="/api/auth/logout" class="logout">
+              Déconnexion
+            </a>
+          </div>
+        ) : (
+          <>
+            <a href="/login">Se connecter</a>
+            <a href="/signup">S'inscrire</a>
+          </>
+        )
+      }
     </div>
 
     <main>
@@ -242,7 +314,7 @@ import "../styles/global.css";
       });
 
       // Fermer le menu au clic sur un lien
-      mobileMenu.querySelectorAll("a").forEach(a => {
+      mobileMenu.querySelectorAll("a").forEach((a) => {
         a.addEventListener("click", () => {
           burger.classList.remove("open");
           mobileMenu.classList.remove("open");
@@ -251,7 +323,7 @@ import "../styles/global.css";
 
       // Lien actif
       const currentPath = window.location.pathname;
-      document.querySelectorAll("nav a, .mobile-menu a").forEach(a => {
+      document.querySelectorAll("nav a, .mobile-menu a").forEach((a) => {
         if (a.getAttribute("href") === currentPath) {
           a.classList.add("active");
         }

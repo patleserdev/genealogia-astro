@@ -1,0 +1,38 @@
+---
+// src/pages/login.astro
+import Baselayout from '../layouts/Baselayout.astro'
+import { getUser } from '../lib/session'
+
+const user = getUser(Astro)
+if (user) return Astro.redirect('/')
+---
+
+<Baselayout title="Se connecter">
+  <form id="loginForm">
+    <input type="email" name="email" placeholder="Email" required />
+    <input type="password" name="password" placeholder="Mot de passe" required />
+    <button type="submit">Se connecter</button>
+  </form>
+
+  <script>
+    document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const form = e.target as HTMLFormElement
+      const email = (form.elements.namedItem('email') as HTMLInputElement).value
+      const password = (form.elements.namedItem('password') as HTMLInputElement).value
+
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (res.ok) {
+        window.location.href = '/'
+      } else {
+        const { error } = await res.json()
+        alert(error)
+      }
+    })
+  </script>
+</Baselayout>

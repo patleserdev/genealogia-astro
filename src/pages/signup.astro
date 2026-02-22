@@ -1,0 +1,33 @@
+---
+import Baselayout from "../layouts/Baselayout.astro";
+
+// src/pages/signup.astro
+---
+<Baselayout title="S'inscrire">
+<form id="signupForm">
+    <input type="text" name="name" placeholder="Nom" required />
+    <input type="email" name="email" placeholder="Email" required />
+    <input type="password" name="password" placeholder="Mot de passe" required />
+    <button type="submit">Créer mon compte</button>
+  </form>
+</Baselayout>
+  <script>
+    document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const form = e.target as HTMLFormElement
+      const data = Object.fromEntries(new FormData(form))
+  
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+  
+      if (res.ok) {
+        window.location.href = '/login'
+      } else {
+        const { error } = await res.json()
+        alert(error)
+      }
+    })
+  </script>
