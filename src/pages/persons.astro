@@ -1,0 +1,79 @@
+---
+import Baselayout from "../layouts/Baselayout.astro";
+import { persons } from "../lib/mongo";
+import { formatDateFR } from "../utils/formatDate";
+
+const data = await persons.find({ active: true }).toArray();
+const personsList = data.map((p) => ({
+    _id: p._id!.toString(),
+    prenom: p.prenom,
+    nom: p.nom,
+    dateNaissance: p.dateNaissance,
+    email: p.email,
+}));
+---
+
+<Baselayout title="Accueil">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">Liste des personnes</h2>
+
+    <div class="action mb-4"><a class="border rounded-md p-2" href="/addperson">Ajouter personne + </a></div>
+    <div class="grid gap-4">
+        {
+            personsList.map((p) => (
+                <div class="bg-white shadow-md rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                        <p class="font-semibold text-gray-800 capitalize">
+                            {p.prenom} {p.nom}
+                        </p>
+                        {p.dateNaissance && (
+                            <p class="text-sm text-gray-500">
+                                Né(e) le : {formatDateFR(p.dateNaissance)}
+                            </p>
+                        )}
+                        {p.email && (
+                            <p class="text-sm text-gray-500">{p.email}</p>
+                        )}
+                    </div>
+
+                    <div class="flex gap-2 items-center">
+                        <a
+                            href={`/person/${p._id}`}
+                            class="text-blue-600 hover:underline text-sm font-medium"
+                        >
+                            Voir
+                        </a>
+
+                        <a
+                            href={`/addperson?id=${p._id}`}
+                            class="text-amber-600 hover:underline text-sm font-medium"
+                        >
+                            Modifier
+                        </a>
+
+                        <button
+                            data-id={p._id}
+                            data-nom={`${p.prenom} ${p.nom}`}
+                            class="delete-btn bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 text-sm font-medium transition-colors"
+                        >
+                            Supprimer
+                        </button>
+                    </div>
+                </div>
+            ))
+        }
+    </div>
+</Baselayout>
+
+<script>
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            const nom = btn.getAttribute("data-nom");
+
+            if (!confirm(`Voulez-vous vraiment supprimer ${nom} ?`)) return;
+
+            await fetch(`/api/persons/${id}`, { method: "DELETE" });
+            window.location.reload();
+        });
+    });
+</script>

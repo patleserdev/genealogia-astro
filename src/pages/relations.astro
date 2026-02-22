@@ -4,7 +4,7 @@ import Baselayout from "../layouts/Baselayout.astro";
 
 import { relations, persons } from "../lib/mongo";
 import { ObjectId } from "mongodb";
-
+import { formatFullName } from "../utils/formatName";
 export const prerender = false;
 
 // Récupérer toutes les relations
@@ -23,8 +23,12 @@ const personsMap = Object.fromEntries(
 ---
 
 <Baselayout title="Toutes les relations">
-    <h2 class="text-2xl font-bold mb-4">Toutes les relations</h2>
-
+    <h2 class="text-2xl font-bold mb-4">Liste des relations</h2>
+    <div class="action mb-4">
+        <a class="border rounded-md p-2" href="/addrelation"
+            >Ajouter une relation +
+        </a>
+    </div>
     <table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
         <thead class="bg-gray-100 border-b">
             <tr>
@@ -41,42 +45,26 @@ const personsMap = Object.fromEntries(
                     <tr class="border-b hover:bg-gray-50">
                         <td class="p-2 border-1 p-1 bg-green-200">{r.type}</td>
                         <td class="p-2">
-                            {personsMap[
-                                r.from.toString()
-                            ]?.prenom.toUpperCase()}{" "}
-                            {personsMap[r.from.toString()]?.nom}
+                            {formatFullName(
+                                personsMap[r.from.toString()]?.prenom,
+                                personsMap[r.from.toString()]?.nom,
+                            )}
                         </td>
                         <td class="p-2">
-                            {personsMap[r.to.toString()]?.prenom}{" "}
-                            {personsMap[r.to.toString()]?.nom}
+                            {formatFullName(
+                                personsMap[r.to.toString()]?.prenom,
+                                personsMap[r.to.toString()]?.nom,
+                            )}
                         </td>
+
                         <td class="p-2">{r.status || "—"}</td>
-                        <td class="p-2 flex flex-row gap-2">
-                            <form
-                                id={`form-${r._id}`}
-                                class="flex gap-2 items-center"
+                        <td class="p-2 flex gap-2">
+                            <a
+                                href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
+                                class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                             >
-                                <select
-                                    name="status"
-                                    class="border rounded px-2 py-1"
-                                >
-                                    <option
-                                        value="ACTIVE"
-                                        selected={r.status === "ACTIVE"}
-                                    >
-                                        ACTIVE
-                                    </option>
-                                    <option
-                                        value="DIVORCED"
-                                        selected={r.status === "DIVORCED"}
-                                    >
-                                        DIVORCED
-                                    </option>
-                                </select>
-                                <button class="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600">
-                                    Modifier
-                                </button>
-                            </form>
+                                ✏️ Modifier
+                            </a>
 
                             <DeleteButton relationId={r._id} />
                         </td>
@@ -85,19 +73,4 @@ const personsMap = Object.fromEntries(
             }
         </tbody>
     </table>
-    <script is:inline>
-        document.querySelectorAll('form[id^="form-"]').forEach((form) => {
-            form.addEventListener("submit", async (e) => {
-                e.preventDefault();
-                const data = Object.fromEntries(new FormData(form));
-                const id = form.id.replace("form-", "");
-                await fetch(`/api/relations/${id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(data),
-                });
-                location.reload();
-            });
-        });
-    </script>
-</BaseLayout>
+</Baselayout>

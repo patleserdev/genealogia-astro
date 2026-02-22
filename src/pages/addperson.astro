@@ -1,14 +1,13 @@
 ---
-
 import Baselayout from "../layouts/Baselayout.astro";
 import { persons } from "../lib/mongo";
 import { ObjectId } from "mongodb";
 
 export const prerender = false;
 
-const { id } = Astro.url.searchParams ? 
-  { id: Astro.url.searchParams.get("id") } : 
-  { id: null };
+// Récupération des paramètres
+const id = Astro.url.searchParams.get("id");
+const returnUrl = Astro.url.searchParams.get("returnUrl") || "/persons";
 
 let person = null;
 if (id) {
@@ -17,11 +16,13 @@ if (id) {
 ---
 
 <Baselayout title={person ? "Modifier une personne" : "Ajouter une personne"}>
+
   <h2 class="text-2xl font-bold mb-6 text-gray-800">
     {person ? `Modifier ${person.prenom} ${person.nom}` : "Ajouter une personne"}
   </h2>
 
   <form id="form" class="bg-white shadow-md rounded-lg p-6 max-w-md mx-auto space-y-4">
+
     <!-- Prénom -->
     <div class="flex flex-col">
       <label class="mb-1 font-medium text-gray-700">Prénom</label>
@@ -89,32 +90,32 @@ if (id) {
       {person ? "Enregistrer les modifications" : "Ajouter"}
     </button>
 
-    {person && (
-      <a
-        href="/"
-        class="block text-center text-sm text-gray-500 hover:underline"
-      >
-        Annuler
-      </a>
-    )}
+    <!-- Bouton Annuler intelligent -->
+    <a
+      href={returnUrl}
+      class="block text-center text-sm text-gray-500 hover:underline"
+    >
+      Annuler
+    </a>
+
   </form>
 
-  <script define:vars={{ personId: id }}>
+  <script define:vars={{ personId: id, returnUrl }}>
     const form = document.getElementById("form");
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(form));
+      data.from=new ObjectId(body.get("from")),
+      data.to= new ObjectId(body.get("to"))
 
       if (personId) {
-        // Mode édition → PATCH
         await fetch(`/api/persons/${personId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),
         });
       } else {
-        // Mode création → POST
         await fetch("/api/persons", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -122,7 +123,9 @@ if (id) {
         });
       }
 
-      window.location.href = "/";
+      // Redirection vers la page d'origine
+      window.location.href = returnUrl;
     });
   </script>
+
 </Baselayout>

@@ -13,43 +13,15 @@ const personsList = data.map(p => ({
 ---
 
 <Baselayout title="Accueil">
-  <h2 class="text-2xl font-bold mb-6 text-gray-800">Liste des personnes</h2>
-
-  <div class="grid gap-4">
-    {personsList.map(p => (
-      <div class="bg-white shadow-md rounded-lg p-4 flex justify-between items-center">
-        <div>
-          <p class="font-semibold text-gray-800 capitalize">{p.prenom} {p.nom}</p>
-          {p.dateNaissance && <p class="text-sm text-gray-500">Né(e) le : {p.dateNaissance}</p>}
-          {p.email && <p class="text-sm text-gray-500">{p.email}</p>}
-        </div>
-
-        <div class="flex gap-2 items-center">
-          <a
-            href={`/persons/${p._id}`}
-            class="text-blue-600 hover:underline text-sm font-medium"
-          >
-            Voir
-          </a>
-
-          <a
-            href={`/addperson?id=${p._id}`}
-            class="text-amber-600 hover:underline text-sm font-medium"
-          >
-            Modifier
-          </a>
-
-          <button
-            data-id={p._id}
-            data-nom={`${p.prenom} ${p.nom}`}
-            class="delete-btn bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 text-sm font-medium transition-colors"
-          >
-            Supprimer
-          </button>
-        </div>
-      </div>
-    ))}
-  </div>
+  <h1 class="text-2xl font-bold mb-6 text-gray-800">Genealogia</h1>
+  <p class="text-lg font-medium mb-6 text-gray-800">Projet d'arbre généalogique</p>
+  
+  <ul>
+    <li>Afficher la liste des personnes (voir, modifier, supprimer)</li>
+    <li>Ajouter une personne</li>
+    <li>Afficher la liste des relations (voir, modifier, supprimer)</li>
+    <li>Ajouter une relation</li>
+  </ul>
 </Baselayout>
 
 <script>

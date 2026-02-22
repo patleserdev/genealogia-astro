@@ -12,5 +12,5 @@ export interface Relation {
   status?: "ACTIVE" | "DIVORCED";
   since?: Date;
   until?: Date;
-  coupleRelationId?: ObjectId; // ← NOUVEAU : sur une relation PARENT, référence la relation CONJOINT
+  coupleRelationId?: ObjectId; 
 }
