@@ -1,0 +1,197 @@
+---
+const { node } = Astro.props;
+
+const CARD_WIDTH = 160;
+const CARD_HEIGHT = 64;
+const V_GAP = 80;
+const H_GAP = 24;
+
+function layoutTree(node, x = 0, y = 0) {
+  if (!node) return [];
+  if (!node.children || node.children.length === 0) {
+    return [{ person: node.person, x, y }];
+  }
+
+  let childLayouts = [];
+  let currentX = x;
+
+  for (const child of node.children) {
+    const cl = layoutTree(child, currentX, y + CARD_HEIGHT + V_GAP);
+    childLayouts.push(cl);
+    currentX += cl[0].x + CARD_WIDTH + H_GAP - x;
+  }
+
+  const firstChildX = childLayouts[0][0].x;
+  const lastChildX = childLayouts[childLayouts.length - 1][0].x;
+  const parentX = firstChildX + (lastChildX - firstChildX) / 2;
+  const childrenFlat = childLayouts.flat();
+
+  return [{ person: node.person, x: parentX, y }, ...childrenFlat];
+}
+
+function generateLineData(node) {
+  let lines = [];
+  if (!node.children || node.children.length === 0) return lines;
+  for (const child of node.children) {
+    lines.push({ from: node.person._id.toString(), to: child.person._id.toString() });
+    lines = lines.concat(generateLineData(child));
+  }
+  return lines;
+}
+
+const PADDING = 40;
+const positions = layoutTree(node);
+const svgWidth  = Math.max(...positions.map(p => p.x)) + CARD_WIDTH + PADDING * 2;
+const svgHeight = Math.max(...positions.map(p => p.y)) + CARD_HEIGHT + PADDING * 2;
+const lineData  = generateLineData(node);
+
+const depths: Record<string, number> = {};
+function computeDepths(n, d = 0) {
+  depths[n.person._id.toString()] = d;
+  for (const c of (n.children || [])) computeDepths(c, d + 1);
+}
+computeDepths(node);
+---
+
+<div class="tree-wrapper">
+  <div class="tree-scroll">
+    <div class="tree-canvas" style={`width:${svgWidth}px;height:${svgHeight}px;`}>
+
+      <svg width={svgWidth} height={svgHeight} class="tree-svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="connectorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#cbd5e1" />
+            <stop offset="100%" stop-color="#94a3b8" />
+          </linearGradient>
+        </defs>
+        {lineData.map(line => {
+          const parent = positions.find(p => p.person._id.toString() === line.from);
+          const child  = positions.find(p => p.person._id.toString() === line.to);
+          if (!parent || !child) return null;
+          const x1 = parent.x + PADDING + CARD_WIDTH / 2;
+          const y1 = parent.y + PADDING + CARD_HEIGHT;
+          const x2 = child.x  + PADDING + CARD_WIDTH / 2;
+          const y2 = child.y  + PADDING;
+          const mid = (y1 + y2) / 2;
+          return (
+            <path
+              d={`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`}
+              fill="none"
+              stroke="url(#connectorGrad)"
+              stroke-width="1.5"
+            />
+          );
+        })}
+      </svg>
+
+      {positions.map(p => {
+        const isRoot = depths[p.person._id.toString()] === 0;
+        return (
+          <div
+            class={`card${isRoot ? ' card--root' : ''}`}
+            style={`top:${p.y + PADDING}px;left:${p.x + PADDING}px;width:${CARD_WIDTH}px;height:${CARD_HEIGHT}px;`}
+          >
+            <a href={`/person/${p.person._id}`} class="card__link">
+              <span class="card__prenom">{p.person.prenom}</span>
+              <span class="card__nom">{p.person.nom}</span>
+            </a>
+          </div>
+        );
+      })}
+
+    </div>
+  </div>
+</div>
+
+<style>
+  .tree-wrapper {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    overflow: hidden;
+  }
+
+  .tree-scroll {
+    overflow: auto;
+  }
+
+  .tree-canvas {
+    position: relative;
+  }
+
+  .tree-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .card {
+    position: absolute;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  }
+
+  .card:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.1);
+    transform: translateY(-1px);
+  }
+
+  .card--root {
+    background: #1e293b;
+    border-color: #1e293b;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .card--root:hover {
+    border-color: #334155;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  }
+
+  .card__link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0 0.75rem;
+    text-decoration: none;
+    gap: 2px;
+  }
+
+  .card__prenom {
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .card__nom {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0f172a;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .card--root .card__prenom { color: #94a3b8; }
+  .card--root .card__nom    { color: #f1f5f9; }
+
+  .card:hover .card__nom       { color: #2563eb; }
+  .card--root:hover .card__nom { color: #93c5fd; }
+</style>

@@ -1,0 +1,31 @@
+---
+import PersonCard from "./PersonCard.astro";
+import FamilyTree from "./FamilyTree.astro"; // 👈 IMPORT RECURSIF OBLIGATOIRE
+
+const { node } = Astro.props;
+---
+
+<div class="flex flex-col items-center gap-6">
+
+  <!-- Parents -->
+  {node.parents && node.parents.length > 0 && (
+    <div class="flex gap-6">
+      {node.parents.map((p) => (
+        <FamilyTree node={p} />
+      ))}
+    </div>
+  )}
+
+  <!-- Person -->
+  <PersonCard person={node.person} />
+
+  <!-- Enfants -->
+  {node.children && node.children.length > 0 && (
+    <div class="flex gap-6">
+      {node.children.map((c) => (
+        <FamilyTree node={c} />
+      ))}
+    </div>
+  )}
+
+</div>

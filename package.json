@@ -2,7 +2,7 @@
   "name": "genealogie-app",
   "type": "module",
   "version": "0.0.1",
-  "license": "none",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

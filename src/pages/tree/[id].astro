@@ -1,0 +1,80 @@
+---
+import Baselayout from "../../layouts/Baselayout.astro";
+import { ObjectId } from "mongodb";
+import { persons, relations } from "../../lib/mongo";
+import FamilyTreeVertical from "../../components/FamilyTreeVertical.astro";
+
+export const prerender = false;
+
+const { id } = Astro.params;
+const personId = new ObjectId(id);
+
+// 1 seule requête Mongo
+const allPersons = await persons.find({}).toArray();
+const allRelations = await relations.find({ type: "PARENT" }).toArray();
+
+// Maps rapides
+const personMap = new Map(allPersons.map(p => [p._id.toString(), p]));
+const childrenMap = new Map<string, string[]>();
+const parentMap = new Map<string, string[]>();
+
+for (const rel of allRelations) {
+  const from = rel.from.toString();
+  const to = rel.to.toString();
+
+  if (!childrenMap.has(from)) childrenMap.set(from, []);
+  if (!parentMap.has(to)) parentMap.set(to, []);
+
+  childrenMap.get(from)!.push(to);
+  parentMap.get(to)!.push(from);
+}
+
+/**
+ * Génère un arbre récursif pour la personne rootId
+ * depthUp : combien de générations de parents à inclure
+ * depthDown : combien de générations d’enfants à inclure
+ */
+function buildTree(rootId: string, depthUp = 1, depthDown = 2) {
+  const visited = new Set<string>();
+
+  function buildNode(id: string, currentDepthUp: number, currentDepthDown: number) {
+    if (!personMap.has(id) || visited.has(id)) return null;
+    visited.add(id);
+
+    const person = personMap.get(id)!;
+
+    // Parents
+    const parents: any[] = [];
+    if (currentDepthUp > 0 && parentMap.has(id)) {
+      for (const pid of parentMap.get(id)!) {
+        const parentNode = buildNode(pid, currentDepthUp - 1, 0);
+        if (parentNode) parents.push(parentNode);
+      }
+    }
+
+    // Enfants
+    const children: any[] = [];
+    if (currentDepthDown > 0 && childrenMap.has(id)) {
+      for (const cid of childrenMap.get(id)!) {
+        const childNode = buildNode(cid, 0, currentDepthDown - 1);
+        if (childNode) children.push(childNode);
+      }
+    }
+
+    return { person, parents, children };
+  }
+
+  return buildNode(rootId, depthUp, depthDown);
+}
+
+const tree = buildTree(personId.toString(), 1, 2);
+---
+<Baselayout title="Arbre généalogique">
+ 
+  <h2 class="text-xl font-bold mb-4">Arbre généalogique</h2>
+  <div class="relative flex items-center justify-center ">
+  
+  <FamilyTreeVertical node={tree} />
+</div>
+
+</Baselayout>

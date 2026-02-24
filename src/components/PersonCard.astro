@@ -1,0 +1,13 @@
+---
+import { formatFullName } from "../utils/formatName.ts";
+
+// components/PersonCard.astro
+const { person } = Astro.props;
+---
+
+<div class="border rounded-lg p-3 shadow bg-white text-center w-40">
+  <a href={`/person/${person._id}`} class="font-semibold text-blue-600 hover:underline">
+    {formatFullName(person.prenom,person.nom)}
+  </a>
+  {person.dateNaissance && <div class="text-xs text-gray-500">{person.dateNaissance}</div>}
+</div>

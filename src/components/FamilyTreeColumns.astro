@@ -1,0 +1,68 @@
+---
+const { levels } = Astro.props;
+---
+
+<div class="tree-container">
+
+  <svg class="lines" width="100%" height="100%">
+    {levels.map((level, i) =>
+      levels[i + 1]?.map((_, j) =>
+        level.map((_, k) => (
+          <line
+            x1={200 * i + 100}
+            y1={120 * k + 40}
+            x2={200 * (i + 1) + 100}
+            y2={120 * j + 40}
+            stroke="#ccc"
+          />
+        ))
+      )
+    )}
+  </svg>
+
+  <div class="columns">
+    {levels.map((level) => (
+      <div class="column">
+        {level.map(person => (
+          <div class="card">
+            <a href={`/person/${person._id}`}>
+              {person.prenom} {person.nom}
+            </a>
+          </div>
+        ))}
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+.tree-container {
+  position: relative;
+}
+
+.columns {
+  display: flex;
+  gap: 4rem;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.card {
+  width: 150px;
+  padding: .5rem;
+  background: white;
+  border-radius: .5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,.1);
+  text-align: center;
+}
+
+.lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+</style>
