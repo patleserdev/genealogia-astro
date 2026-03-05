@@ -20,11 +20,12 @@ const personsMap = Object.fromEntries(
 );
 
 const conjointRels = allRelations.filter((r) => r.type === "CONJOINT");
-const parentRels = allRelations.filter((r) => r.type === "PARENT");
+const parentRels   = allRelations.filter((r) => r.type === "PARENT");
 ---
 
 <Baselayout title="Toutes les relations">
   <div class="max-w-6xl mx-auto">
+
     <div class="flex items-center justify-between mb-6">
       <h2 class="text-2xl font-bold text-gray-800">Liste des relations</h2>
       <a
@@ -35,100 +36,242 @@ const parentRels = allRelations.filter((r) => r.type === "PARENT");
       </a>
     </div>
 
-   <!-- CONJOINTS -->
-<section class="mb-8">
-    <h3 class="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-3">
-      💍 Couples ({conjointRels.length})
-    </h3>
-    <div class="flex flex-col gap-3">
-      {conjointRels.map((r) => {
-        const from = personsMap[r.from.toString()];
-        const to = personsMap[r.to.toString()];
-        return (
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-            <!-- Statut -->
-            <span class={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${r.status === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-              {r.status === "ACTIVE" ? "✅ En couple" : "❌ Divorcé"}
-            </span>
-  
-            <!-- Noms -->
-            <div class="flex items-center gap-2 flex-1 font-medium text-gray-800">
-              <a href={`/person/${from?._id}`} class="hover:underline text-blue-600">
-                {formatFullName(from?.prenom, from?.nom)}
-              </a>
-              <span class="text-gray-300">↔</span>
-              <a href={`/person/${to?._id}`} class="hover:underline text-blue-600">
-                {formatFullName(to?.prenom, to?.nom)}
-              </a>
-            </div>
-  
-            <!-- Dates -->
-            {(r.dateDebut || r.dateFin) && (
-              <p class="text-xs text-gray-400 whitespace-nowrap">
-                {r.dateDebut && <>Depuis {formatDateFR(r.dateDebut)}</>}
-                {r.dateFin && <> — {formatDateFR(r.dateFin)}</>}
-              </p>
-            )}
-  
-            <!-- Actions -->
-            <div class="flex gap-3 sm:ml-auto">
-              <a
-                href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
-                class="text-amber-600 hover:underline text-sm font-medium"
-              >
-                ✏️ Modifier
-              </a>
-              <DeleteButton type="relation" id={r._id} />
-            </div>
-          </div>
-        );
-      })}
+    <!-- ── Barre de recherche & filtres ── -->
+    <div class="flex flex-wrap gap-3 items-center mb-6 p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
+      <input
+        id="search-input"
+        type="text"
+        placeholder="Rechercher par nom ou prénom..."
+        class="border rounded-lg px-3 py-1.5 text-sm text-gray-700 flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-300"
+      />
+
+      <!-- Filtre type de relation -->
+      <div class="flex gap-2">
+        <button data-filter="all"      class="filter-btn active text-xs font-semibold px-3 py-1.5 rounded-full border transition">
+          Tous
+        </button>
+        <button data-filter="CONJOINT" class="filter-btn text-xs font-semibold px-3 py-1.5 rounded-full border transition">
+          💍 Couples
+        </button>
+        <button data-filter="PARENT"   class="filter-btn text-xs font-semibold px-3 py-1.5 rounded-full border transition">
+          👨‍👧 Parent/Enfant
+        </button>
+      </div>
+
+      <!-- Filtre statut couple -->
+      <div class="flex gap-2" id="status-filters">
+        <button data-status="all"      class="status-btn active text-xs font-semibold px-3 py-1.5 rounded-full border transition">
+          Tous statuts
+        </button>
+        <button data-status="ACTIVE"   class="status-btn text-xs font-semibold px-3 py-1.5 rounded-full border transition">
+          ✅ En couple
+        </button>
+        <button data-status="DIVORCED" class="status-btn text-xs font-semibold px-3 py-1.5 rounded-full border transition">
+          ❌ Divorcé
+        </button>
+      </div>
+
+      <span id="result-count" class="text-xs text-gray-400 ml-auto whitespace-nowrap"></span>
     </div>
-  </section>
-  
-  <!-- PARENTS -->
-  <section>
-    <h3 class="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-3">
-      👨‍👧 Relations parent / enfant ({parentRels.length})
-    </h3>
-    <div class="flex flex-col gap-3">
-      {parentRels.map((r) => {
-        const from = personsMap[r.from.toString()];
-        const to = personsMap[r.to.toString()];
-        return (
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-            <!-- Parent -->
-            <div class="flex items-center gap-1">
-              <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Parent</span>
-              <a href={`/person/${from?._id}`} class="font-medium text-blue-600 hover:underline">
-                {formatFullName(from?.prenom, from?.nom)}
-              </a>
+
+    <!-- ── CONJOINTS ── -->
+    <section class="mb-8" id="section-conjoint">
+      <h3 class="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-3">
+        💍 Couples (<span class="conjoint-count">{conjointRels.length}</span>)
+      </h3>
+      <div class="flex flex-col gap-3" id="list-conjoint">
+        {conjointRels.map((r) => {
+          const from = personsMap[r.from.toString()];
+          const to   = personsMap[r.to.toString()];
+          const fromName = `${from?.prenom ?? ''} ${from?.nom ?? ''}`.toLowerCase();
+          const toName   = `${to?.prenom ?? ''} ${to?.nom ?? ''}`.toLowerCase();
+          return (
+            <div
+              class="rel-row bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+              data-type="CONJOINT"
+              data-status={r.status ?? ''}
+              data-search={`${fromName} ${toName}`}
+            >
+              <span class={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${r.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                {r.status === 'ACTIVE' ? '✅ En couple' : '❌ Divorcé'}
+              </span>
+
+              <div class="flex items-center gap-2 flex-1 font-medium text-gray-800">
+                <a href={`/person/${from?._id}`} class="hover:underline text-blue-600">
+                  {formatFullName(from?.prenom, from?.nom)}
+                </a>
+                <span class="text-gray-300">↔</span>
+                <a href={`/person/${to?._id}`} class="hover:underline text-blue-600">
+                  {formatFullName(to?.prenom, to?.nom)}
+                </a>
+              </div>
+
+              {(r.dateDebut || r.dateFin) && (
+                <p class="text-xs text-gray-400 whitespace-nowrap">
+                  {r.dateDebut && <>Depuis {formatDateFR(r.dateDebut)}</>}
+                  {r.dateFin && <> — {formatDateFR(r.dateFin)}</>}
+                </p>
+              )}
+
+              <div class="flex gap-3 sm:ml-auto">
+                <a
+                  href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
+                  class="text-amber-600 hover:underline text-sm font-medium"
+                >
+                  ✏️ Modifier
+                </a>
+                <DeleteButton type="relation" id={r._id} />
+              </div>
             </div>
-  
-            <span class="text-gray-300 hidden sm:inline">→</span>
-  
-            <!-- Enfant -->
-            <div class="flex items-center gap-1 flex-1">
-              <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Enfant</span>
-              <a href={`/person/${to?._id}`} class="font-medium text-blue-600 hover:underline">
-                {formatFullName(to?.prenom, to?.nom)}
-              </a>
+          );
+        })}
+      </div>
+    </section>
+
+    <!-- ── PARENTS ── -->
+    <section id="section-parent">
+      <h3 class="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-3">
+        👨‍👧 Relations parent / enfant (<span class="parent-count">{parentRels.length}</span>)
+      </h3>
+      <div class="flex flex-col gap-3" id="list-parent">
+        {parentRels.map((r) => {
+          const from = personsMap[r.from.toString()];
+          const to   = personsMap[r.to.toString()];
+          const fromName = `${from?.prenom ?? ''} ${from?.nom ?? ''}`.toLowerCase();
+          const toName   = `${to?.prenom ?? ''} ${to?.nom ?? ''}`.toLowerCase();
+          return (
+            <div
+              class="rel-row bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+              data-type="PARENT"
+              data-status=""
+              data-search={`${fromName} ${toName}`}
+            >
+              <div class="flex items-center gap-1">
+                <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Parent</span>
+                <a href={`/person/${from?._id}`} class="font-medium text-blue-600 hover:underline">
+                  {formatFullName(from?.prenom, from?.nom)}
+                </a>
+              </div>
+
+              <span class="text-gray-300 hidden sm:inline">→</span>
+
+              <div class="flex items-center gap-1 flex-1">
+                <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Enfant</span>
+                <a href={`/person/${to?._id}`} class="font-medium text-blue-600 hover:underline">
+                  {formatFullName(to?.prenom, to?.nom)}
+                </a>
+              </div>
+
+              <div class="flex gap-3 sm:ml-auto">
+                <a
+                  href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
+                  class="text-amber-600 hover:underline text-sm font-medium"
+                >
+                  ✏️ Modifier
+                </a>
+                <DeleteButton type="relation" id={r._id} />
+              </div>
             </div>
-  
-            <!-- Actions -->
-            <div class="flex gap-3 sm:ml-auto">
-              <a
-                href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
-                class="text-amber-600 hover:underline text-sm font-medium"
-              >
-                ✏️ Modifier
-              </a>
-              <DeleteButton type="relation" id={r._id} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  </section>
+          );
+        })}
+      </div>
+    </section>
+
+    <p id="no-results" class="hidden text-gray-400 text-sm mt-6 text-center">Aucune relation trouvée.</p>
+
   </div>
 </Baselayout>
+
+<style>
+  .filter-btn, .status-btn {
+    background: #f8fafc;
+    color: #64748b;
+    border-color: #e2e8f0;
+  }
+  .filter-btn:hover, .status-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+  }
+  .filter-btn.active, .status-btn.active {
+    background: #1e293b;
+    color: #f1f5f9;
+    border-color: #1e293b;
+  }
+</style>
+
+<script>
+  const searchInput   = document.getElementById('search-input') as HTMLInputElement;
+  const noResults     = document.getElementById('no-results') as HTMLElement;
+  const resultCount   = document.getElementById('result-count') as HTMLElement;
+  const filterBtns    = document.querySelectorAll<HTMLElement>('.filter-btn');
+  const statusBtns    = document.querySelectorAll<HTMLElement>('.status-btn');
+  const statusFilters = document.getElementById('status-filters') as HTMLElement;
+
+  let activeType   = 'all';
+  let activeStatus = 'all';
+
+  function applyFilters() {
+    const query = searchInput.value.toLowerCase().trim();
+    const rows  = document.querySelectorAll<HTMLElement>('.rel-row');
+
+    let visible = 0;
+
+    rows.forEach(row => {
+      const type     = row.dataset.type   ?? '';
+      const status   = row.dataset.status ?? '';
+      const search   = row.dataset.search ?? '';
+
+      const matchType   = activeType === 'all'   || type === activeType;
+      const matchStatus = activeStatus === 'all' || status === activeStatus || type === 'PARENT';
+      const matchSearch = !query || search.includes(query);
+
+      const show = matchType && matchStatus && matchSearch;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+
+    // Masquer les sections entièrement vides
+    updateSectionVisibility('CONJOINT', 'section-conjoint', 'conjoint-count');
+    updateSectionVisibility('PARENT',   'section-parent',   'parent-count');
+
+    // Afficher/masquer les filtres de statut selon le type actif
+    statusFilters.style.display = activeType === 'PARENT' ? 'none' : '';
+
+    resultCount.textContent = `${visible} résultat${visible > 1 ? 's' : ''}`;
+    noResults.classList.toggle('hidden', visible > 0);
+  }
+
+  function updateSectionVisibility(type: string, sectionId: string, countClass: string) {
+    const section = document.getElementById(sectionId)!;
+    const rows    = section.querySelectorAll<HTMLElement>('.rel-row');
+    const visibleCount = Array.from(rows).filter(r => r.style.display !== 'none').length;
+
+    section.style.display = visibleCount === 0 ? 'none' : '';
+    section.querySelector(`.${countClass}`)!.textContent = String(visibleCount);
+  }
+
+  // Boutons filtre type
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeType = btn.dataset.filter ?? 'all';
+      applyFilters();
+    });
+  });
+
+  // Boutons filtre statut
+  statusBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      statusBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeStatus = btn.dataset.status ?? 'all';
+      applyFilters();
+    });
+  });
+
+  searchInput.addEventListener('input', applyFilters);
+
+  // Init compteur
+  applyFilters();
+</script>

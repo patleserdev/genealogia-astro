@@ -171,6 +171,7 @@ for (const rel of parentRels) {
     <div class="bg-white shadow-md rounded-lg p-6 mb-8 mx-auto max-w-md">
       <p><span class="font-semibold">Email :</span> {person.email || "Non renseigné"}</p>
       <p><span class="font-semibold">Date de naissance :</span> {formatDateFR(person.dateNaissance) || "Non renseignée"}</p>
+      
       {person.dateDeces && <p><span class="font-semibold">Date de décès :</span> {formatDateFR(person.dateDeces)}</p>}
       <p><span class="font-semibold">Sexe :</span> {person.sexe || "Non renseigné"}</p>
       {person.notes && <p class="mt-2 text-gray-600 italic">{person.notes}</p>}

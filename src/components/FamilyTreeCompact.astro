@@ -1,0 +1,593 @@
+---
+import { formatDateFR } from "../utils/formatDate.ts";
+
+const { node } = Astro.props;
+
+const CARD_WIDTH   = 100;
+const CARD_HEIGHT  = 44;
+const COUPLE_GAP   = 16;
+const COUPLE_WIDTH = CARD_WIDTH * 2 + COUPLE_GAP;
+const V_GAP        = 56;
+const H_GAP        = 20;
+const PADDING      = 60;
+
+interface Person {
+  _id: string;
+  prenom: string;
+  nom: string;
+  sexe?: string | null;
+  dateNaissance?: string | null;
+  dateDeces?: string | null;
+  unionStatus?: string | null;
+}
+
+interface ChildGroup {
+  coParent: Person | null;
+  children: TreeNode[];
+}
+
+interface TreeNode {
+  person: Person;
+  conjoint?: Person | null;
+  childGroups?: ChildGroup[];
+}
+
+interface PositionedNode {
+  person: Person;
+  coParent: Person | null;
+  allChildGroups: ChildGroup[];
+  conjoint: Person | null;
+  x: number;
+  y: number;
+}
+
+function resolveCoParents(node: TreeNode): Map<string, Person | null> {
+  const map = new Map<string, Person | null>();
+  function walk(n: TreeNode) {
+    if (!n.childGroups || n.childGroups.length === 0) {
+      map.set(n.person._id, n.conjoint ?? null);
+      return;
+    }
+    let bestGroup: ChildGroup | null = null;
+    for (const group of n.childGroups) {
+      if (!bestGroup || group.children.length > bestGroup.children.length) bestGroup = group;
+    }
+    map.set(n.person._id, bestGroup?.coParent ?? n.conjoint ?? null);
+    for (const group of n.childGroups)
+      for (const child of group.children) walk(child);
+  }
+  walk(node);
+  return map;
+}
+
+function subtreeWidth(node: TreeNode): number {
+  const ownWidth = (coParentMap.get(node.person._id) ?? null) ? COUPLE_WIDTH : CARD_WIDTH;
+  if (!node.childGroups || node.childGroups.length === 0) return ownWidth;
+  let total = 0, childCount = 0;
+  for (const group of node.childGroups)
+    for (const child of group.children) { total += subtreeWidth(child); childCount++; }
+  if (childCount === 0) return ownWidth;
+  return Math.max(ownWidth, total + H_GAP * (childCount - 1));
+}
+
+function layoutTree(node: TreeNode, x = 0, y = 0): PositionedNode[] {
+  if (!node) return [];
+  if (!node.childGroups || node.childGroups.length === 0) {
+    return [{ person: node.person, coParent: node.conjoint ?? null, allChildGroups: [], conjoint: node.conjoint ?? null, x, y }];
+  }
+  let childrenTotalWidth = 0, childCount = 0;
+  for (const group of node.childGroups)
+    for (const child of group.children) { childrenTotalWidth += subtreeWidth(child); childCount++; }
+  if (childCount > 1) childrenTotalWidth += H_GAP * (childCount - 1);
+
+  const ownWidth = (coParentMap.get(node.person._id) ?? null) ? COUPLE_WIDTH : CARD_WIDTH;
+  const startX = x + Math.max(0, (ownWidth - childrenTotalWidth) / 2);
+  const allChildLayouts: PositionedNode[][] = [];
+  let currentX = startX;
+
+  for (const group of node.childGroups)
+    for (const child of group.children) {
+      const cl = layoutTree(child, currentX, y + CARD_HEIGHT + V_GAP);
+      allChildLayouts.push(cl);
+      currentX += subtreeWidth(child) + H_GAP;
+    }
+
+  const firstChildX = allChildLayouts[0][0].x;
+  const lastChildX  = allChildLayouts[allChildLayouts.length - 1][0].x;
+  const lastChildOwnWidth = (coParentMap.get(allChildLayouts[allChildLayouts.length - 1][0].person._id) ?? null) ? COUPLE_WIDTH : CARD_WIDTH;
+  const parentX = firstChildX + (lastChildX + lastChildOwnWidth - firstChildX) / 2 - ownWidth / 2;
+
+  return [
+    { person: node.person, coParent: coParentMap.get(node.person._id) ?? null, allChildGroups: node.childGroups, conjoint: node.conjoint ?? null, x: parentX, y },
+    ...allChildLayouts.flat()
+  ];
+}
+
+function generateLineData(node: TreeNode): { from: string; to: string }[] {
+  let lines: { from: string; to: string }[] = [];
+  if (!node.childGroups) return lines;
+  for (const group of node.childGroups)
+    for (const child of group.children) {
+      lines.push({ from: node.person._id, to: child.person._id });
+      lines = lines.concat(generateLineData(child));
+    }
+  return lines;
+}
+
+const coParentMap = resolveCoParents(node);
+const positions   = layoutTree(node);
+
+const enriched: PositionedNode[] = positions.map(p => ({
+  ...p,
+  coParent: coParentMap.get(p.person._id) ?? null,
+  allChildGroups: p.allChildGroups ?? [],
+  conjoint: p.conjoint ?? null,
+}));
+
+const svgWidth  = Math.max(...enriched.map(p => p.x)) + COUPLE_WIDTH + PADDING * 2;
+const svgHeight = Math.max(...enriched.map(p => p.y)) + CARD_HEIGHT  + PADDING * 2;
+const lineData  = generateLineData(node);
+
+const depths: Record<string, number> = {};
+function computeDepths(n: TreeNode, d = 0) {
+  depths[n.person._id] = d;
+  for (const g of (n.childGroups || []))
+    for (const c of g.children) computeDepths(c, d + 1);
+}
+computeDepths(node);
+
+// Floating coparents (multi-union)
+interface FloatingCoParent { person: Person; cx: number; cy: number; }
+const floatingCoParents: FloatingCoParent[] = [];
+for (const p of enriched) {
+  const groupCoParentIds = new Set(p.allChildGroups.map(g => g.coParent?._id).filter(Boolean));
+  const hasExtraConjoint = !!(p.conjoint && !groupCoParentIds.has(p.conjoint._id));
+  const totalConjoints = p.allChildGroups.filter(g => g.coParent).length + (hasExtraConjoint ? 1 : 0);
+  if (totalConjoints <= 1) continue;
+
+  for (const group of p.allChildGroups) {
+    if (!group.coParent || group.children.length === 0) continue;
+    const childPositions = group.children.map(c => enriched.find(e => e.person._id === c.person._id)).filter(Boolean) as PositionedNode[];
+    if (childPositions.length === 0) continue;
+    const leftmost  = Math.min(...childPositions.map(c => c.x));
+    const rightmost = Math.max(...childPositions.map(c => c.x + ((c.allChildGroups.length > 0 || c.conjoint) ? COUPLE_WIDTH : CARD_WIDTH)));
+    floatingCoParents.push({ person: group.coParent, cx: (leftmost + rightmost) / 2 - CARD_WIDTH / 2, cy: p.y });
+  }
+  if (hasExtraConjoint && p.conjoint)
+    floatingCoParents.push({ person: p.conjoint, cx: p.x + CARD_WIDTH + COUPLE_GAP, cy: p.y });
+}
+---
+
+<div class="tc-outer">
+  <!-- Toolbar -->
+  <div class="tc-toolbar">
+    <button id="tc-zoom-in"  class="tc-btn" title="Zoom +">＋</button>
+    <button id="tc-zoom-out" class="tc-btn" title="Zoom −">－</button>
+    <button id="tc-reset"    class="tc-btn" title="Réinitialiser">⌂</button>
+    <span id="tc-zoom-label" class="tc-zoom-label">100%</span>
+    <span class="tc-hint">🖱 molette · glisser pour naviguer</span>
+  </div>
+
+  <!-- Canvas zoomable -->
+  <div class="tc-viewport" id="tc-viewport">
+    <div class="tc-stage" id="tc-stage">
+      <div class="tc-canvas" style={`width:${svgWidth}px;height:${svgHeight}px;`}>
+
+        <svg width={svgWidth} height={svgHeight} class="tc-svg" aria-hidden="true">
+          {lineData.map(line => {
+            const parent = enriched.find(p => p.person._id === line.from);
+            const child  = enriched.find(p => p.person._id === line.to);
+            if (!parent || !child) return null;
+            const pw = parent.coParent ? COUPLE_WIDTH : CARD_WIDTH;
+            const cw = child.coParent  ? COUPLE_WIDTH : CARD_WIDTH;
+            const x1 = parent.x + PADDING + pw / 2;
+            const y1 = parent.y + PADDING + CARD_HEIGHT;
+            const x2 = child.x  + PADDING + cw / 2;
+            const y2 = child.y  + PADDING;
+            const mid = (y1 + y2) / 2;
+            return (
+              <path d={`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`}
+                fill="none" stroke="#94a3b8" stroke-width="1" />
+            );
+          })}
+        </svg>
+
+        {/* Cartes principales */}
+        {enriched.map(p => {
+          const isRoot     = depths[p.person._id] === 0;
+          const isDeceased = !!p.person.dateDeces;
+          const groupCoParentIds = new Set(p.allChildGroups.map(g => g.coParent?._id).filter(Boolean));
+          const hasExtraConjoint = !!(p.conjoint && !groupCoParentIds.has(p.conjoint._id));
+          const totalConjoints = p.allChildGroups.filter(g => g.coParent).length + (hasExtraConjoint ? 1 : 0);
+
+          let inlineConjoint: Person | null = null;
+          if (totalConjoints === 1) {
+            if (p.allChildGroups.length === 1 && p.allChildGroups[0].coParent) inlineConjoint = p.allChildGroups[0].coParent;
+            else if (p.conjoint) inlineConjoint = p.conjoint;
+          }
+          const isDivorced   = inlineConjoint?.unionStatus === 'DIVORCED';
+          const isCpDeceased = !!inlineConjoint?.dateDeces;
+
+          return (
+            <div class="tc-couple-node" style={`top:${p.y + PADDING}px;left:${p.x + PADDING}px;`}>
+              <a href={`/tree/${p.person._id}`}
+                class={`tc-card${isRoot ? ' tc-card--root' : ''}${isDeceased ? ' tc-card--deceased' : ''}`}
+                style={`width:${CARD_WIDTH}px;height:${CARD_HEIGHT}px;`}
+              >
+                <span class="tc-prenom">{p.person.prenom}</span>
+                <span class="tc-nom">{p.person.nom.toUpperCase()}</span>
+                {isDeceased && <span class="tc-cross">✝</span>}
+              </a>
+
+              {inlineConjoint && (
+                <>
+                  <div class={`tc-sep${isDivorced ? ' tc-sep--divorced' : ''}`}>
+                    {isDivorced ? '✂' : '♥'}
+                  </div>
+                  <a href={`/tree/${inlineConjoint._id}`}
+                    class={['tc-card','tc-card--conjoint', isDivorced ? 'tc-card--divorced' : '', isRoot ? 'tc-card--root' : '', isCpDeceased ? 'tc-card--deceased' : ''].filter(Boolean).join(' ')}
+                    style={`width:${CARD_WIDTH}px;height:${CARD_HEIGHT}px;`}
+                  >
+                    <span class="tc-prenom">{inlineConjoint.prenom}</span>
+                    <span class="tc-nom">{inlineConjoint.nom.toUpperCase()}</span>
+                    {isCpDeceased && <span class="tc-cross">✝</span>}
+                  </a>
+                </>
+              )}
+            </div>
+          );
+        })}
+
+        {/* CoParents flottants */}
+        {floatingCoParents.map(({ person: cp, cx, cy }) => {
+          const isDivorced   = cp.unionStatus === 'DIVORCED';
+          const isCpDeceased = !!cp.dateDeces;
+          return (
+            <div class="tc-couple-node" style={`top:${cy + PADDING}px;left:${cx + PADDING}px;`}>
+              <a href={`/tree/${cp._id}`}
+                class={['tc-card','tc-card--conjoint', isDivorced ? 'tc-card--divorced' : '', isCpDeceased ? 'tc-card--deceased' : ''].filter(Boolean).join(' ')}
+                style={`width:${CARD_WIDTH}px;height:${CARD_HEIGHT}px;`}
+              >
+                <span class="tc-prenom">{cp.prenom}</span>
+                <span class="tc-nom">{cp.nom.toUpperCase()}</span>
+                {isCpDeceased && <span class="tc-cross">✝</span>}
+              </a>
+            </div>
+          );
+        })}
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .tc-outer {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 80vh;
+    min-height: 400px;
+  }
+
+  /* ── Toolbar ── */
+  .tc-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
+  }
+  .tc-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, border-color 0.12s;
+    flex-shrink: 0;
+  }
+  .tc-btn:hover { background: #e2e8f0; border-color: #94a3b8; }
+  .tc-zoom-label {
+    font-size: 0.7rem;
+    color: #64748b;
+    min-width: 38px;
+    text-align: center;
+  }
+  .tc-hint {
+    font-size: 0.65rem;
+    color: #94a3b8;
+    margin-left: auto;
+  }
+
+  /* ── Viewport ── */
+  .tc-viewport {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    cursor: grab;
+  }
+  .tc-viewport.grabbing { cursor: grabbing; }
+
+  .tc-stage {
+    position: absolute;
+    top: 0; left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  .tc-canvas {
+    position: relative;
+  }
+
+  .tc-svg {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 0;
+  }
+
+  /* ── Couple node ── */
+  .tc-couple-node {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    z-index: 1;
+  }
+
+  .tc-sep {
+    font-size: 0.55rem;
+    color: #f43f5e;
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+  .tc-sep--divorced { color: #94a3b8; }
+
+  /* ── Cards ── */
+  .tc-card {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.4rem;
+    gap: 1px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    text-decoration: none;
+    transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+    cursor: pointer;
+  }
+  .tc-card:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 3px 10px rgba(59,130,246,0.15);
+    transform: translateY(-1px);
+    z-index: 2;
+  }
+
+  .tc-card--root {
+    background: #1e293b;
+    border-color: #1e293b;
+  }
+  .tc-card--conjoint {
+    background: #fff0f3;
+    border-color: #fecdd3;
+  }
+  .tc-card--conjoint:hover { border-color: #f43f5e; }
+  .tc-card--divorced {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    border-style: dashed;
+  }
+  .tc-card--deceased {
+    background: #334155;
+    border-color: #1e293b;
+  }
+  .tc-card--deceased:hover { border-color: #475569; }
+
+  .tc-prenom {
+    font-size: 0.58rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+  }
+  .tc-nom {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #0f172a;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+  }
+  .tc-cross {
+    position: absolute;
+    top: 2px; right: 4px;
+    font-size: 0.45rem;
+    color: #64748b;
+    line-height: 1;
+  }
+
+  .tc-card--root .tc-prenom     { color: #94a3b8; }
+  .tc-card--root .tc-nom        { color: #f1f5f9; }
+  .tc-card--conjoint .tc-prenom { color: #9f1239; }
+  .tc-card--conjoint .tc-nom    { color: #881337; }
+  .tc-card--divorced .tc-prenom { color: #94a3b8; }
+  .tc-card--divorced .tc-nom    { color: #64748b; }
+  .tc-card--deceased .tc-prenom { color: #94a3b8; }
+  .tc-card--deceased .tc-nom    { color: #e2e8f0; }
+
+  .tc-card:hover .tc-nom              { color: #2563eb; }
+  .tc-card--root:hover .tc-nom        { color: #93c5fd; }
+  .tc-card--deceased:hover .tc-nom    { color: #f1f5f9; }
+</style>
+
+<script>
+  const viewport = document.getElementById('tc-viewport') as HTMLElement;
+  const stage    = document.getElementById('tc-stage')    as HTMLElement;
+  const btnIn    = document.getElementById('tc-zoom-in')  as HTMLButtonElement;
+  const btnOut   = document.getElementById('tc-zoom-out') as HTMLButtonElement;
+  const btnReset = document.getElementById('tc-reset')    as HTMLButtonElement;
+  const zoomLabel = document.getElementById('tc-zoom-label') as HTMLElement;
+
+  const MIN_ZOOM = 0.15;
+  const MAX_ZOOM = 2.5;
+  const ZOOM_STEP = 0.15;
+
+  let zoom = 1;
+  let panX = 0;
+  let panY = 0;
+  let isPanning = false;
+  let startX = 0, startY = 0;
+
+  function applyTransform() {
+    stage.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    zoomLabel.textContent = Math.round(zoom * 100) + '%';
+  }
+
+  function clampPan() {
+    // Optionnel : pas de clamp, laisser libre
+  }
+
+  function centerOnRoot() {
+    const canvas = stage.querySelector('.tc-canvas') as HTMLElement;
+    const rootCard = canvas?.querySelector('.tc-card--root') as HTMLElement;
+    if (!rootCard || !canvas) return;
+
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+
+    // Position du rootCard dans le canvas
+    const parent = rootCard.closest('.tc-couple-node') as HTMLElement;
+    const cardLeft = parent ? parseInt(parent.style.left) : 0;
+    const cardTop  = parent ? parseInt(parent.style.top)  : 0;
+    const cardW = rootCard.offsetWidth;
+    const cardH = rootCard.offsetHeight;
+
+    // Centrer horizontalement, afficher depuis le haut
+    panX = vw / 2 - (cardLeft + cardW / 2) * zoom;
+    panY = 40 - cardTop * zoom;
+    applyTransform();
+  }
+
+  // Initial zoom adapté à la largeur du canvas
+  function initZoom() {
+    const canvas = stage.querySelector('.tc-canvas') as HTMLElement;
+    if (!canvas) return;
+    const canvasW = canvas.offsetWidth;
+    const vw = viewport.clientWidth;
+    const fitZoom = Math.min(1, (vw * 0.9) / canvasW);
+    zoom = Math.max(MIN_ZOOM, fitZoom);
+    centerOnRoot();
+  }
+
+  // Zoom boutons
+  btnIn.addEventListener('click', () => {
+    zoom = Math.min(MAX_ZOOM, zoom + ZOOM_STEP);
+    applyTransform();
+  });
+  btnOut.addEventListener('click', () => {
+    zoom = Math.max(MIN_ZOOM, zoom - ZOOM_STEP);
+    applyTransform();
+  });
+  btnReset.addEventListener('click', () => {
+    initZoom();
+  });
+
+  // Zoom molette
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = viewport.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + delta));
+
+    // Zoom centré sur le curseur
+    panX = mouseX - (mouseX - panX) * (newZoom / zoom);
+    panY = mouseY - (mouseY - panY) * (newZoom / zoom);
+    zoom = newZoom;
+    applyTransform();
+  }, { passive: false });
+
+  // Pan souris
+  viewport.addEventListener('mousedown', (e) => {
+    // Ne pas panner si on clique sur une carte
+    if ((e.target as HTMLElement).closest('.tc-card')) return;
+    isPanning = true;
+    startX = e.clientX - panX;
+    startY = e.clientY - panY;
+    viewport.classList.add('grabbing');
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!isPanning) return;
+    panX = e.clientX - startX;
+    panY = e.clientY - startY;
+    applyTransform();
+  });
+  window.addEventListener('mouseup', () => {
+    isPanning = false;
+    viewport.classList.remove('grabbing');
+  });
+
+  // Pan tactile
+  let lastTouchX = 0, lastTouchY = 0;
+  let lastTouchDist = 0;
+  viewport.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      lastTouchDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  }, { passive: true });
+  viewport.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      const dx = e.touches[0].clientX - lastTouchX;
+      const dy = e.touches[0].clientY - lastTouchY;
+      panX += dx; panY += dy;
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
+      applyTransform();
+    } else if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const delta = (dist - lastTouchDist) * 0.01;
+      zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + delta));
+      lastTouchDist = dist;
+      applyTransform();
+    }
+  }, { passive: false });
+
+  // Init après render
+  requestAnimationFrame(() => {
+    requestAnimationFrame(initZoom);
+  });
+</script>

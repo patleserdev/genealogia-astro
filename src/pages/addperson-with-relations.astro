@@ -64,6 +64,10 @@ const coupleRelationsData = coupleRelations.map((r) => {
           <input type="date" id="dateNaissance" class="w-full rounded-lg border-gray-300" />
         </div>
         <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">Date de décès</label>
+          <input type="date" id="dateDeces" class="w-full rounded-lg border-gray-300" />
+        </div>
+        <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">Sexe</label>
           <select id="sexe" class="w-full rounded-lg border-gray-300">
             <option value="">— Non renseigné —</option>
@@ -127,7 +131,7 @@ const coupleRelationsData = coupleRelations.map((r) => {
       <!-- Recherche personne -->
       <div class="relative">
         <input type="text" placeholder="Rechercher une personne…"
-          class="person-search w-full rounded-lg border-gray-300 text-sm" autocomplete="off" />
+          class="person-search w-full rounded-lg border-gray-300 text-sm" autocomplete="off" required/>
         <ul class="person-results absolute z-10 w-full bg-white border border-gray-200 rounded-lg hidden max-h-40 overflow-y-auto divide-y divide-gray-100 shadow-md"></ul>
         <p class="person-selected text-xs text-blue-700 font-medium mt-1 hidden"></p>
       </div>
@@ -281,6 +285,7 @@ const coupleRelationsData = coupleRelations.map((r) => {
         nom,
         sexe: document.getElementById("sexe").value || undefined,
         dateNaissance: document.getElementById("dateNaissance").value || undefined,
+        dateDeces: document.getElementById("dateDeces").value || undefined,
         email: document.getElementById("email").value || undefined,
         active: true,
       }),

@@ -1,0 +1,427 @@
+---
+import { formatDateFR } from "../utils/formatDate.ts";
+
+const { node } = Astro.props;
+
+interface Person {
+  _id: string;
+  prenom: string;
+  nom: string;
+  dateNaissance?: string | null;
+  dateDeces?: string | null;
+  unionStatus?: string | null;
+}
+interface ChildGroup { coParent: Person | null; children: TreeNode[]; }
+interface TreeNode {
+  person: Person;
+  conjoint?: Person | null;
+  childGroups?: ChildGroup[];
+}
+
+interface GridPerson {
+  person: Person;
+  generation: number;
+  conjointNames: { name: string; isDivorced: boolean }[];
+  childNames: string[];
+  childCount: number;
+  isDeceased: boolean;
+}
+
+// Flatten tree into list with generation depth
+// Inclut aussi les conjoints à la même génération
+function flattenTree(n: TreeNode, gen = 0, seen = new Set<string>()): GridPerson[] {
+  if (seen.has(n.person._id)) return [];
+  seen.add(n.person._id);
+
+  // Collecter tous les coParents distincts
+  const seenCp = new Set<string>();
+  const conjointNames: { name: string; isDivorced: boolean }[] = [];
+  const allCoParents: Person[] = [];
+
+  for (const g of (n.childGroups ?? [])) {
+    if (g.coParent && !seenCp.has(g.coParent._id)) {
+      seenCp.add(g.coParent._id);
+      allCoParents.push(g.coParent);
+      conjointNames.push({
+        name: `${g.coParent.prenom} ${g.coParent.nom}`,
+        isDivorced: g.coParent.unionStatus === 'DIVORCED',
+      });
+    }
+  }
+  if (n.conjoint && !seenCp.has(n.conjoint._id)) {
+    seenCp.add(n.conjoint._id);
+    allCoParents.push(n.conjoint);
+    conjointNames.push({
+      name: `${n.conjoint.prenom} ${n.conjoint.nom}`,
+      isDivorced: n.conjoint.unionStatus === 'DIVORCED',
+    });
+  }
+
+  const allChildren = (n.childGroups ?? []).flatMap(g => g.children);
+  const childCount = allChildren.length;
+  const childNames = allChildren.map(c => c.person.prenom);
+
+  const result: GridPerson[] = [{
+    person: n.person,
+    generation: gen,
+    conjointNames,
+    childNames,
+    childCount,
+    isDeceased: !!n.person.dateDeces,
+  }];
+
+  // Ajouter les conjoints comme entrées distinctes à la même génération
+  for (const cp of allCoParents) {
+    if (seen.has(cp._id)) continue;
+    seen.add(cp._id);
+
+    // Trouver les enfants communs avec ce conjoint spécifiquement
+    const sharedChildren = (n.childGroups ?? [])
+      .filter(g => g.coParent?._id === cp._id)
+      .flatMap(g => g.children);
+    // Si pas de groupe avec ce coParent (= conjoint actif sans enfants), utiliser tous les enfants
+    const cpChildNames = sharedChildren.length > 0
+      ? sharedChildren.map(c => c.person.prenom)
+      : [];
+    const cpChildCount = cpChildNames.length;
+
+    result.push({
+      person: cp,
+      generation: gen,
+      conjointNames: [{
+        name: `${n.person.prenom} ${n.person.nom}`,
+        isDivorced: cp.unionStatus === 'DIVORCED',
+      }],
+      childNames: cpChildNames,
+      childCount: cpChildCount,
+      isDeceased: !!cp.dateDeces,
+    });
+  }
+
+  for (const g of (n.childGroups ?? [])) {
+    for (const c of g.children) {
+      result.push(...flattenTree(c, gen + 1, seen));
+    }
+  }
+  return result;
+}
+
+const allPersons = flattenTree(node);
+
+// Group by generation
+const genMap = new Map<number, GridPerson[]>();
+for (const p of allPersons) {
+  if (!genMap.has(p.generation)) genMap.set(p.generation, []);
+  genMap.get(p.generation)!.push(p);
+}
+const generations = [...genMap.entries()].sort((a, b) => a[0] - b[0]);
+
+const genLabels = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+
+function initials(prenom: string, nom: string): string {
+  return `${prenom.charAt(0)}${nom.charAt(0)}`.toUpperCase();
+}
+
+// Deterministic soft color from name
+function avatarHue(prenom: string): number {
+  let h = 0;
+  for (let i = 0; i < prenom.length; i++) h = (h * 37 + prenom.charCodeAt(i)) % 360;
+  return h;
+}
+---
+
+<div class="fg-wrapper">
+
+  {generations.map(([genIdx, persons]) => (
+    <section class="fg-generation">
+
+      <div class="fg-gen-label">
+        <span class="fg-gen-roman">{genLabels[genIdx] ?? `G${genIdx + 1}`}</span>
+        <span class="fg-gen-count">{persons.length} pers.</span>
+      </div>
+
+      <div class="fg-grid">
+        {persons.map(({ person, conjointNames, childNames, childCount, isDeceased }) => {
+          const hue = avatarHue(person.prenom);
+          return (
+            <a href={`/tree/${person._id}`} class={`fg-card${isDeceased ? ' fg-card--deceased' : ''}`}>
+
+              <div class="fg-avatar" style={`--hue:${hue}`}>
+                {isDeceased
+                  ? <span class="fg-avatar__cross">✝</span>
+                  : <span class="fg-avatar__initials">{initials(person.prenom, person.nom)}</span>
+                }
+              </div>
+
+              <div class="fg-info">
+                <p class="fg-prenom">{person.prenom}</p>
+                <p class="fg-nom">{person.nom.toUpperCase()}</p>
+
+                {(person.dateNaissance || person.dateDeces) && (
+                  <p class="fg-dates">
+                    {person.dateNaissance && <span>🎂 {formatDateFR(person.dateNaissance)}</span>}
+                    {person.dateDeces    && <span>✝ {formatDateFR(person.dateDeces)}</span>}
+                  </p>
+                )}
+
+                {conjointNames.length > 0 && (
+                  <div class="fg-conjoints">
+                    {conjointNames.map(c => (
+                      <p class={`fg-conjoint${c.isDivorced ? ' fg-conjoint--divorced' : ''}`}>
+                        {c.isDivorced ? '✂' : '♥'} {c.name}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {childCount > 0 && (
+                  <div class="fg-children-block">
+                    <p class="fg-children-count">{childCount} enfant{childCount > 1 ? 's' : ''}</p>
+                    <p class="fg-children-names">{childNames.join(', ')}</p>
+                  </div>
+                )}
+              </div>
+
+            </a>
+          );
+        })}
+      </div>
+
+    </section>
+  ))}
+
+</div>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=EB+Garamond:wght@400;500&display=swap');
+
+  .fg-wrapper {
+    font-family: 'EB Garamond', Georgia, serif;
+    background: #faf8f4;
+    border: 1px solid #e8e0d0;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* ── Génération ── */
+  .fg-generation {
+    border-bottom: 1px solid #e8e0d0;
+    padding: 1.5rem 1.75rem;
+  }
+  .fg-generation:last-child { border-bottom: none; }
+
+  .fg-gen-label {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .fg-gen-roman {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #3d2f1f;
+    letter-spacing: 0.1em;
+    min-width: 2rem;
+  }
+  .fg-gen-count {
+    font-size: 0.72rem;
+    color: #a0917a;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* ── Grille ── */
+  .fg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 0.75rem;
+  }
+
+  /* ── Carte ── */
+  .fg-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem 0.75rem 0.85rem;
+    background: #fff;
+    border: 1px solid #e5ddd0;
+    border-radius: 10px;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(61,47,31,.06);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    cursor: pointer;
+  }
+  .fg-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(61,47,31,.12);
+    border-color: #c4a97d;
+  }
+  .fg-card--deceased {
+    background: #f0ece4;
+    border-color: #d4c9b8;
+  }
+  .fg-card--deceased:hover {
+    border-color: #a0917a;
+    box-shadow: 0 6px 20px rgba(61,47,31,.1);
+  }
+
+  /* ── Avatar ── */
+  .fg-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: oklch(88% 0.06 calc(var(--hue, 30) * 1deg));
+    border: 2px solid oklch(75% 0.08 calc(var(--hue, 30) * 1deg));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .fg-card--deceased .fg-avatar {
+    background: #d4c9b8;
+    border-color: #b5a892;
+  }
+  .fg-avatar__initials {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: oklch(35% 0.06 calc(var(--hue, 30) * 1deg));
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+  .fg-avatar__cross {
+    font-size: 1rem;
+    color: #8a7a68;
+    line-height: 1;
+  }
+
+  /* ── Infos ── */
+  .fg-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    width: 100%;
+    min-width: 0;
+  }
+  .fg-prenom {
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 0.78rem;
+    color: #8a7a68;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+    letter-spacing: 0.03em;
+  }
+  .fg-nom {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #3d2f1f;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+  .fg-card--deceased .fg-nom { color: #6b5e50; }
+
+  .fg-dates {
+    margin: 0.2rem 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+  }
+  .fg-dates span {
+    font-size: 0.65rem;
+    color: #a0917a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .fg-conjoint {
+    margin: 0.2rem 0 0;
+    font-size: 0.65rem;
+    color: #b5736a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .fg-children {
+    margin: 0.15rem 0 0;
+    font-size: 0.62rem;
+    color: #a0917a;
+    text-align: center;
+  }
+
+  .fg-conjoints {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05rem;
+    margin-top: 0.2rem;
+    width: 100%;
+  }
+  .fg-conjoint {
+    margin: 0;
+    font-size: 0.63rem;
+    color: #b5736a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+  }
+  .fg-conjoint--divorced {
+    color: #94a3b8;
+    text-decoration: line-through;
+    text-decoration-color: #cbd5e1;
+  }
+
+  .fg-children-block {
+    margin-top: 0.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    width: 100%;
+  }
+  .fg-children-count {
+    margin: 0;
+    font-size: 0.62rem;
+    color: #a0917a;
+    text-align: center;
+    font-weight: 500;
+  }
+  .fg-children-names {
+    margin: 0;
+    font-size: 0.6rem;
+    color: #b8a990;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    font-style: italic;
+  }
+
+  /* Fallback si oklch non supporté */
+  @supports not (color: oklch(0% 0 0)) {
+    .fg-avatar { background: #e8dfd0; border-color: #c4b89a; }
+    .fg-avatar__initials { color: #6b5e50; }
+  }
+</style>

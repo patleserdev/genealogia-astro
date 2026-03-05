@@ -17,58 +17,134 @@ const personsList = data.map((p) => ({
 <Baselayout title="Accueil">
     <h2 class="text-2xl font-bold mb-6 text-gray-800">Liste des personnes</h2>
 
-    <div class="action mb-4"><a class="border rounded-md p-2" href="/addperson">Ajouter personne + </a></div>
-    <div class="grid gap-4">
+    <div class="action mb-4 flex flex-wrap gap-3 items-center">
+        <a class="border rounded-md p-2" href="/addperson">Ajouter personne +</a>
+
+        <input
+            id="search-input"
+            type="text"
+            placeholder="Rechercher par nom ou prénom..."
+            class="border rounded-md p-2 flex-1 min-w-[200px] text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+        />
+
+        <button
+            id="sort-toggle"
+            data-order="asc"
+            class="border rounded-md p-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1"
+        >
+            Tri : A → Z
+        </button>
+    </div>
+
+    <div id="persons-list" class="grid gap-4">
         {
-            personsList .sort((a, b) => a.nom.localeCompare(b.nom, "fr"))
-            .map((p) => (
-                <div class="bg-white shadow-md rounded-lg p-4 flex justify-between items-center">
-                    <div>
-                        <p class="font-semibold text-gray-800 capitalize">
-                            {p.prenom} {p.nom}
-                        </p>
-                        {p.dateNaissance && (
-                            <p class="text-sm text-gray-500">
-                                Né(e) le : {formatDateFR(p.dateNaissance)}
+            personsList
+                .sort((a, b) => a.nom.localeCompare(b.nom, "fr"))
+                .map((p) => (
+                    <div
+                        class="person-card bg-white shadow-md rounded-lg p-4 flex justify-between items-center"
+                        data-nom={p.nom.toLowerCase()}
+                        data-prenom={p.prenom.toLowerCase()}
+                    >
+                        <div>
+                            <p class="font-semibold text-gray-800 capitalize">
+                                {p.prenom} {p.nom}
                             </p>
-                        )}
-                        {p.email && (
-                            <p class="text-sm text-gray-500">{p.email}</p>
-                        )}
-                    </div>
+                            {p.dateNaissance && (
+                                <p class="text-sm text-gray-500">
+                                    Né(e) le : {formatDateFR(p.dateNaissance)}
+                                </p>
+                            )}
+                            {p.email && (
+                                <p class="text-sm text-gray-500">{p.email}</p>
+                            )}
+                        </div>
 
-                    <div class="p-2 flex flex-row items-center justify-center gap-4 actions">
-                        <a
-                            href={`/person/${p._id}`}
-                            class="text-blue-600 hover:underline text-sm font-medium"
-                        >
-                            Voir
-                        </a>
-
-                        <a
-                            href={`/addperson?id=${p._id}`}
-                            class="text-amber-600 hover:underline text-sm font-medium"
-                        >
-                            Modifier
-                        </a>
-                        <DeleteButton type="person" id={p._id} />
+                        <div class="p-2 flex flex-row items-center justify-center gap-4 actions">
+                            <a
+                                href={`/person/${p._id}`}
+                                class="text-blue-600 hover:underline text-sm font-medium"
+                            >
+                                Voir
+                            </a>
+                            <a
+                                href={`/tree/${p._id}`}
+                                class="text-blue-600 hover:underline text-sm font-medium"
+                            >
+                                Vue arbre
+                            </a>
+                            <a
+                                href={`/addperson?id=${p._id}`}
+                                class="text-amber-600 hover:underline text-sm font-medium"
+                            >
+                                Modifier
+                            </a>
+                            <DeleteButton type="person" id={p._id} />
+                        </div>
                     </div>
-                </div>
-            ))
+                ))
         }
     </div>
+
+    <p id="no-results" class="hidden text-gray-500 text-sm mt-4">Aucune personne trouvée.</p>
 </Baselayout>
 
 <script>
+    // ── Suppression ──────────────────────────────────────────────
     document.querySelectorAll(".delete-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
             const id = btn.getAttribute("data-id");
             const nom = btn.getAttribute("data-nom");
-
             if (!confirm(`Voulez-vous vraiment supprimer ${nom} ?`)) return;
-
             await fetch(`/api/persons/${id}`, { method: "DELETE" });
             window.location.reload();
         });
+    });
+
+    // ── Recherche & tri ──────────────────────────────────────────
+    const searchInput = document.getElementById("search-input") as HTMLInputElement;
+    const sortToggle = document.getElementById("sort-toggle") as HTMLButtonElement;
+    const list = document.getElementById("persons-list") as HTMLElement;
+    const noResults = document.getElementById("no-results") as HTMLElement;
+
+    function getCards() {
+        return Array.from(list.querySelectorAll<HTMLElement>(".person-card"));
+    }
+
+    function applyFilterAndSort() {
+        const query = searchInput.value.toLowerCase().trim();
+        const order = sortToggle.dataset.order; // "asc" | "desc"
+
+        let cards = getCards();
+
+        // Filtrage
+        cards.forEach((card) => {
+            const nom = card.dataset.nom ?? "";
+            const prenom = card.dataset.prenom ?? "";
+            const match = nom.includes(query) || prenom.includes(query);
+            card.style.display = match ? "" : "none";
+        });
+
+        // Tri (on réordonne les éléments visibles dans le DOM)
+        const visibleCards = cards.filter((c) => c.style.display !== "none");
+        visibleCards.sort((a, b) => {
+            const nomA = (a.dataset.nom ?? "") + (a.dataset.prenom ?? "");
+            const nomB = (b.dataset.nom ?? "") + (b.dataset.prenom ?? "");
+            const cmp = nomA.localeCompare(nomB, "fr");
+            return order === "asc" ? cmp : -cmp;
+        });
+        visibleCards.forEach((card) => list.appendChild(card));
+
+        // Message "aucun résultat"
+        noResults.classList.toggle("hidden", visibleCards.length > 0);
+    }
+
+    searchInput.addEventListener("input", applyFilterAndSort);
+
+    sortToggle.addEventListener("click", () => {
+        const isAsc = sortToggle.dataset.order === "asc";
+        sortToggle.dataset.order = isAsc ? "desc" : "asc";
+        sortToggle.textContent = isAsc ? "Tri : Z → A" : "Tri : A → Z";
+        applyFilterAndSort();
     });
 </script>

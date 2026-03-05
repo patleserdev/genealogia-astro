@@ -3,47 +3,83 @@ import Baselayout from "../../layouts/Baselayout.astro";
 import { ObjectId } from "mongodb";
 import { persons, relations } from "../../lib/mongo";
 import FamilyTreeVertical from "../../components/FamilyTreeVertical.astro";
-
+import FamilyTreeList from "../../components/FamilyTreeList.astro";
+import FamilyTreeCompact from "../../components/FamilyTreeCompact.astro";
+import FamilyTreeGrid from "../../components/FamilyTreeGrid.astro";
 export const prerender = false;
 
 const { id } = Astro.params;
 const personId = new ObjectId(id);
 
-// 1 seule requête Mongo
 const allPersons = await persons.find({}).toArray();
-const allRelations = await relations.find({ type: "PARENT" }).toArray();
+const allRelations = await relations.find({}).toArray();
 
-// Maps rapides
-const personMap = new Map(allPersons.map(p => [p._id.toString(), p]));
-const childrenMap = new Map<string, string[]>();
+const personMap = new Map(allPersons.map((p) => [p._id!.toString(), p]));
+
+const parentRelations = allRelations.filter((r) => r.type === "PARENT");
+const conjointRelations = allRelations.filter((r) => r.type === "CONJOINT");
+
+const childrenMap = new Map<string, { childId: string; coupleRelationId: string | null }[]>();
 const parentMap = new Map<string, string[]>();
 
-for (const rel of allRelations) {
+for (const rel of parentRelations) {
   const from = rel.from.toString();
   const to = rel.to.toString();
+  const coupleRelationId = rel.coupleRelationId?.toString() ?? null;
 
   if (!childrenMap.has(from)) childrenMap.set(from, []);
-  if (!parentMap.has(to)) parentMap.set(to, []);
+  childrenMap.get(from)!.push({ childId: to, coupleRelationId });
 
-  childrenMap.get(from)!.push(to);
+  if (!parentMap.has(to)) parentMap.set(to, []);
   parentMap.get(to)!.push(from);
 }
 
-/**
- * Génère un arbre récursif pour la personne rootId
- * depthUp : combien de générations de parents à inclure
- * depthDown : combien de générations d’enfants à inclure
- */
+const coupleMap = new Map<string, { personA: string; personB: string; status: string | null }>();
+const conjointMap = new Map<string, { conjointId: string; relationId: string; status: string | null }[]>();
+
+for (const rel of conjointRelations) {
+  const relId  = rel._id!.toString();
+  const from   = rel.from.toString();
+  const to     = rel.to.toString();
+  const status = rel.status ?? null;
+
+  coupleMap.set(relId, { personA: from, personB: to, status });
+
+  if (!conjointMap.has(from)) conjointMap.set(from, []);
+  conjointMap.get(from)!.push({ conjointId: to, relationId: relId, status });
+
+  if (!conjointMap.has(to)) conjointMap.set(to, []);
+  conjointMap.get(to)!.push({ conjointId: from, relationId: relId, status });
+}
+
+function serializePerson(p: any, unionStatus?: string | null) {
+  return {
+    _id: p._id!.toString(),
+    prenom: p.prenom,
+    nom: p.nom,
+    sexe: p.sexe ?? null,
+    dateNaissance: p.dateNaissance ?? null,
+    dateDeces: p.dateDeces ?? null,
+    unionStatus: unionStatus ?? null,
+  };
+}
+
 function buildTree(rootId: string, depthUp = 1, depthDown = 2) {
   const visited = new Set<string>();
 
-  function buildNode(id: string, currentDepthUp: number, currentDepthDown: number) {
+  function buildNode(id: string, currentDepthUp: number, currentDepthDown: number): any {
     if (!personMap.has(id) || visited.has(id)) return null;
     visited.add(id);
 
-    const person = personMap.get(id)!;
+    const person = serializePerson(personMap.get(id)!);
 
-    // Parents
+    const conjointEntries = conjointMap.get(id) ?? [];
+    const conjointEntry = conjointEntries.find(e => e.status === 'ACTIVE') ?? conjointEntries[0] ?? null;
+
+    const conjoint = conjointEntry && personMap.has(conjointEntry.conjointId)
+      ? serializePerson(personMap.get(conjointEntry.conjointId)!, conjointEntry.status)
+      : null;
+
     const parents: any[] = [];
     if (currentDepthUp > 0 && parentMap.has(id)) {
       for (const pid of parentMap.get(id)!) {
@@ -52,29 +88,118 @@ function buildTree(rootId: string, depthUp = 1, depthDown = 2) {
       }
     }
 
-    // Enfants
-    const children: any[] = [];
-    if (currentDepthDown > 0 && childrenMap.has(id)) {
-      for (const cid of childrenMap.get(id)!) {
-        const childNode = buildNode(cid, 0, currentDepthDown - 1);
-        if (childNode) children.push(childNode);
+    const childrenByCouple = new Map<string, string[]>();
+
+    if (currentDepthDown > 0) {
+      if (childrenMap.has(id)) {
+        for (const { childId, coupleRelationId } of childrenMap.get(id)!) {
+          const key = coupleRelationId ?? "__none__";
+          if (!childrenByCouple.has(key)) childrenByCouple.set(key, []);
+          childrenByCouple.get(key)!.push(childId);
+        }
+      }
+
+      for (const entry of conjointEntries) {
+        const partnerId = entry.conjointId;
+        const relId     = entry.relationId;
+
+        if (childrenMap.has(partnerId)) {
+          for (const { childId, coupleRelationId } of childrenMap.get(partnerId)!) {
+            if (coupleRelationId === relId) {
+              const key = coupleRelationId;
+              if (!childrenByCouple.has(key)) childrenByCouple.set(key, []);
+              if (!childrenByCouple.get(key)!.includes(childId))
+                childrenByCouple.get(key)!.push(childId);
+            }
+          }
+        }
       }
     }
 
-    return { person, parents, children };
+    const childGroups: any[] = [];
+    for (const [coupleRelId, childIds] of childrenByCouple) {
+      let coParent = null;
+      if (coupleRelId !== "__none__" && coupleMap.has(coupleRelId)) {
+        const couple = coupleMap.get(coupleRelId)!;
+        const coParentId = couple.personA === id ? couple.personB : couple.personA;
+        if (personMap.has(coParentId)) {
+          coParent = serializePerson(personMap.get(coParentId)!, couple.status);
+        }
+      }
+
+      const children: any[] = [];
+      for (const cid of childIds) {
+        const childNode = buildNode(cid, 0, currentDepthDown - 1);
+        if (childNode) children.push(childNode);
+      }
+
+      if (children.length > 0) {
+        childGroups.push({ coParent, children });
+      }
+    }
+
+    return { person, conjoint, parents, childGroups };
   }
 
   return buildNode(rootId, depthUp, depthDown);
 }
 
 const tree = buildTree(personId.toString(), 1, 2);
+
+const rootParentIds = parentMap.get(personId.toString()) ?? [];
+const parentId = rootParentIds[0] ?? null;
 ---
+
 <Baselayout title="Arbre généalogique">
- 
-  <h2 class="text-xl font-bold mb-4">Arbre généalogique</h2>
-  <div class="relative flex items-center justify-center ">
-  
-  <FamilyTreeVertical node={tree} />
-</div>
+
+  <!-- En-tête : titre + boutons sur la même ligne -->
+  <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+    <h2 class="text-xl font-bold">Arbre généalogique</h2>
+    <div class="flex gap-2 text-sm">
+      <button id="btn-tree"    class="view-btn active">🌳 Arbre</button>
+      <button id="btn-compact" class="view-btn">🔍 Compact</button>
+      <button id="btn-grid"    class="view-btn">⊞ Grille</button>
+      <button id="btn-list"    class="view-btn">📋 Liste</button>
+    </div>
+  </div>
+
+  <!-- Vues : chacune prend toute la largeur disponible -->
+  <div id="view-tree">
+    <FamilyTreeVertical node={tree} parentId={parentId} />
+  </div>
+  <div id="view-compact" class="hidden">
+    <FamilyTreeCompact node={tree} />
+  </div>
+  <div id="view-grid" class="hidden">
+    <FamilyTreeGrid node={tree} />
+  </div>
+  <div id="view-list" class="hidden">
+    <FamilyTreeList node={tree} />
+  </div>
 
 </Baselayout>
+
+<script>
+  type View = 'tree' | 'compact' | 'grid' | 'list';
+  const views: View[] = ['tree', 'compact', 'grid', 'list'];
+
+  const els = Object.fromEntries(
+    views.map(v => [v, {
+      btn:  document.getElementById(`btn-${v}`)!,
+      view: document.getElementById(`view-${v}`)!,
+    }])
+  ) as Record<View, { btn: HTMLElement; view: HTMLElement }>;
+
+  function switchTo(v: View) {
+    views.forEach(k => {
+      els[k].btn.classList.toggle('active', k === v);
+      els[k].view.classList.toggle('hidden', k !== v);
+    });
+    sessionStorage.setItem('tree-view', v);
+  }
+
+  const saved = sessionStorage.getItem('tree-view') as View | null;
+  if (saved && views.includes(saved)) switchTo(saved);
+
+  views.forEach(v => els[v].btn.addEventListener('click', () => switchTo(v)));
+</script>

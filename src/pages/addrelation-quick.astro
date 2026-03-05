@@ -6,6 +6,7 @@ import { formatFullName } from "../utils/formatName.ts";
 export const prerender = false;
 
 const persons = await personsCol.find({ active: true }).toArray();
+const allPersonsForCouples = await personsCol.find({}).toArray();  // ← pour les labels
 const coupleRelations = await relationsCol.find({ type: "CONJOINT" }).toArray();
 
 function isMajeur(dateNaissance?: string): boolean {
@@ -25,9 +26,10 @@ const personsData = persons
   }))
   .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 
-const coupleRelationsData = coupleRelations.map((r) => {
-  const p1 = personsData.find((p) => p._id === r.from.toString());
-  const p2 = personsData.find((p) => p._id === r.to.toString());
+  const coupleRelationsData = coupleRelations.map((r) => {
+  // ← utiliser allPersonsForCouples au lieu de personsData
+  const p1 = allPersonsForCouples.find((p) => p._id!.toString() === r.from.toString());
+  const p2 = allPersonsForCouples.find((p) => p._id!.toString() === r.to.toString());
   return {
     _id: r._id!.toString(),
     fromId: r.from.toString(),
@@ -241,27 +243,38 @@ const coupleRelationsData = coupleRelations.map((r) => {
 
   // --- Suggestions couples selon personnes sélectionnées ---
   function updateCoupleSuggestions() {
-    const select = document.getElementById("coupleRelationId");
-    select.innerHTML = '<option value="">— Aucun couple —</option>';
+  const select = document.getElementById("coupleRelationId");
+  select.innerHTML = '<option value="">— Aucun couple —</option>';
 
-    let filtered = coupleRelationsData;
-    if (selectedA) {
-      filtered = filtered.filter(c => c.fromId === selectedA._id || c.toId === selectedA._id);
-    }
-    if (selectedB) {
-      filtered = filtered.filter(c => c.fromId === selectedB._id || c.toId === selectedB._id);
-    }
+  let filtered = coupleRelationsData;
 
-    filtered.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c._id;
-      opt.textContent = c.label;
-      select.appendChild(opt);
-    });
-
-    if (filtered.length === 1) select.value = filtered[0]._id;
+  if (selectedA || selectedB) {
+    const ids = [selectedA?._id, selectedB?._id].filter(Boolean);
+    // ← Garder les couples dont AU MOINS UN membre est dans la sélection
+    filtered = filtered.filter(c =>
+      ids.some(id => c.fromId === id || c.toId === id)
+    );
   }
 
+  filtered.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c._id;
+    opt.textContent = c.label;
+    select.appendChild(opt);
+  });
+
+  // Auto-sélectionner si un seul couple correspond exactement aux deux personnes
+  if (selectedA && selectedB) {
+    const exact = filtered.find(c =>
+      (c.fromId === selectedA._id && c.toId === selectedB._id) ||
+      (c.fromId === selectedB._id && c.toId === selectedA._id)
+    );
+    if (exact) select.value = exact._id;
+    else if (filtered.length === 1) select.value = filtered[0]._id;
+  } else if (filtered.length === 1) {
+    select.value = filtered[0]._id;
+  }
+}
   // --- Récap ---
   function updateRecap() {
     const recap = document.getElementById("recap");
