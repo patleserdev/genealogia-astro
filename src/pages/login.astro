@@ -186,7 +186,7 @@ const registrationEnabled =
 
                 <!-- Mot de passe -->
                 <div>
-                  <div class="flex items-center justify-between mb-1">
+                  {/**}<div class="flex items-center justify-between mb-1">
                     <label class="block text-xs font-medium text-stone-700"
                       >Mot de passe</label
                     >
@@ -195,7 +195,7 @@ const registrationEnabled =
                       class="text-xs text-amber-700 hover:underline"
                       >Mot de passe oublié ?</a
                     >
-                  </div>
+                  </div>**/}
                   <div class="relative">
                     <input
                       type="password"
@@ -264,7 +264,7 @@ const registrationEnabled =
                 </button>
               </form>
               {
-                registrationEnabled && (
+                !registrationEnabled && (
                   <p class="text-center text-sm text-stone-500 mt-4">
                     Pas encore de compte ?
                     <a
