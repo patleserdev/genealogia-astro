@@ -187,7 +187,7 @@ for (const p of enriched) {
             const mid = (y1 + y2) / 2;
             return (
               <path d={`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`}
-                fill="none" stroke="#94a3b8" stroke-width="1" />
+                fill="none" stroke="#d6d3d1" stroke-width="1" />
             );
           })}
         </svg>
@@ -263,8 +263,8 @@ for (const p of enriched) {
 
 <style>
   .tc-outer {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: #fafaf9;
+    border: 1px solid #e7e5e4;
     border-radius: 12px;
     overflow: hidden;
     display: flex;
@@ -280,16 +280,16 @@ for (const p of enriched) {
     gap: 0.4rem;
     padding: 0.5rem 0.75rem;
     background: #fff;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e7e5e4;
     flex-shrink: 0;
   }
   .tc-btn {
     width: 28px;
     height: 28px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #e7e5e4;
     border-radius: 6px;
-    background: #f8fafc;
-    color: #475569;
+    background: #fafaf9;
+    color: #57534e;
     font-size: 0.85rem;
     cursor: pointer;
     display: flex;
@@ -298,64 +298,34 @@ for (const p of enriched) {
     transition: background 0.12s, border-color 0.12s;
     flex-shrink: 0;
   }
-  .tc-btn:hover { background: #e2e8f0; border-color: #94a3b8; }
+  .tc-btn:hover { background: #e7e5e4; border-color: #a8a29e; }
+
   .tc-zoom-label {
     font-size: 0.7rem;
-    color: #64748b;
+    color: #78716c;
     min-width: 38px;
     text-align: center;
   }
   .tc-hint {
     font-size: 0.65rem;
-    color: #94a3b8;
+    color: #a8a29e;
     margin-left: auto;
   }
 
   /* ── Viewport ── */
-  .tc-viewport {
-    flex: 1;
-    overflow: hidden;
-    position: relative;
-    cursor: grab;
-  }
+  .tc-viewport         { flex: 1; overflow: hidden; position: relative; cursor: grab; }
   .tc-viewport.grabbing { cursor: grabbing; }
-
-  .tc-stage {
-    position: absolute;
-    top: 0; left: 0;
-    transform-origin: 0 0;
-    will-change: transform;
-  }
-
-  .tc-canvas {
-    position: relative;
-  }
-
-  .tc-svg {
-    position: absolute;
-    top: 0; left: 0;
-    pointer-events: none;
-    overflow: visible;
-    z-index: 0;
-  }
+  .tc-stage            { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
+  .tc-canvas           { position: relative; }
+  .tc-svg              { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; z-index: 0; }
 
   /* ── Couple node ── */
-  .tc-couple-node {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    z-index: 1;
-  }
+  .tc-couple-node { position: absolute; display: flex; align-items: center; z-index: 1; }
 
-  .tc-sep {
-    font-size: 0.55rem;
-    color: #f43f5e;
-    padding: 0 4px;
-    flex-shrink: 0;
-  }
-  .tc-sep--divorced { color: #94a3b8; }
+  .tc-sep           { font-size: 0.55rem; color: #f43f5e; padding: 0 4px; flex-shrink: 0; }
+  .tc-sep--divorced { color: #a8a29e; }
 
-  /* ── Cards ── */
+  /* ── Carte de base ── */
   .tc-card {
     position: relative;
     box-sizing: border-box;
@@ -366,43 +336,50 @@ for (const p of enriched) {
     padding: 0 0.4rem;
     gap: 1px;
     background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    border: 1px solid #e7e5e4;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(28,25,23,.06);
     text-decoration: none;
-    transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+    transition: border-color .12s, box-shadow .12s, transform .12s;
     cursor: pointer;
   }
   .tc-card:hover {
-    border-color: #93c5fd;
-    box-shadow: 0 3px 10px rgba(59,130,246,0.15);
+    border-color: #d97706;
+    box-shadow: 0 3px 10px rgba(180,83,9,.12);
     transform: translateY(-1px);
     z-index: 2;
   }
 
-  .tc-card--root {
-    background: #1e293b;
-    border-color: #1e293b;
-  }
-  .tc-card--conjoint {
-    background: #fff0f3;
-    border-color: #fecdd3;
-  }
-  .tc-card--conjoint:hover { border-color: #f43f5e; }
-  .tc-card--divorced {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-    border-style: dashed;
-  }
-  .tc-card--deceased {
-    background: #334155;
-    border-color: #1e293b;
-  }
-  .tc-card--deceased:hover { border-color: #475569; }
+  /* ── Racine ── */
+  .tc-card--root               { background: #78350f; border-color: #78350f; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  .tc-card--root:hover         { border-color: #92400e; box-shadow: 0 4px 12px rgba(120,53,15,.3); }
+  .tc-card--root .tc-prenom    { color: #d97706; }
+  .tc-card--root .tc-nom       { color: #fef3c7; }
+  .tc-card--root:hover .tc-nom { color: #fde68a; }
 
+  /* ── Conjoint ── */
+  .tc-card--conjoint               { background: #fff7ed; border-color: #fed7aa; }
+  .tc-card--conjoint:hover         { border-color: #d97706; }
+  .tc-card--conjoint .tc-prenom    { color: #c2410c; }
+  .tc-card--conjoint .tc-nom       { color: #9a3412; }
+
+  /* ── Divorcé ── */
+  .tc-card--divorced               { background: #fafaf9; border-color: #d6d3d1; border-style: dashed; }
+  .tc-card--divorced:hover         { border-color: #a8a29e; }
+  .tc-card--divorced .tc-prenom    { color: #a8a29e; }
+  .tc-card--divorced .tc-nom       { color: #78716c; }
+
+  /* ── Décédé ── */
+  .tc-card--deceased               { background: #292524; border-color: #1c1917; }
+  .tc-card--deceased:hover         { border-color: #44403c; }
+  .tc-card--deceased .tc-prenom    { color: #78716c; }
+  .tc-card--deceased .tc-nom       { color: #e7e5e4; }
+  .tc-card--deceased:hover .tc-nom { color: #fafaf9; }
+
+  /* ── Textes ── */
   .tc-prenom {
     font-size: 0.58rem;
-    color: #64748b;
+    color: #78716c;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -412,7 +389,7 @@ for (const p of enriched) {
   .tc-nom {
     font-size: 0.68rem;
     font-weight: 600;
-    color: #0f172a;
+    color: #1c1917;
     letter-spacing: 0.02em;
     white-space: nowrap;
     overflow: hidden;
@@ -424,22 +401,11 @@ for (const p of enriched) {
     position: absolute;
     top: 2px; right: 4px;
     font-size: 0.45rem;
-    color: #64748b;
+    color: #57534e;
     line-height: 1;
   }
 
-  .tc-card--root .tc-prenom     { color: #94a3b8; }
-  .tc-card--root .tc-nom        { color: #f1f5f9; }
-  .tc-card--conjoint .tc-prenom { color: #9f1239; }
-  .tc-card--conjoint .tc-nom    { color: #881337; }
-  .tc-card--divorced .tc-prenom { color: #94a3b8; }
-  .tc-card--divorced .tc-nom    { color: #64748b; }
-  .tc-card--deceased .tc-prenom { color: #94a3b8; }
-  .tc-card--deceased .tc-nom    { color: #e2e8f0; }
-
-  .tc-card:hover .tc-nom              { color: #2563eb; }
-  .tc-card--root:hover .tc-nom        { color: #93c5fd; }
-  .tc-card--deceased:hover .tc-nom    { color: #f1f5f9; }
+  .tc-card:hover .tc-nom { color: #92400e; }
 </style>
 
 <script>

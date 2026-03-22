@@ -1,8 +1,44 @@
 import type { APIRoute } from "astro";
-import { relations } from "../../../lib/mongo";
+import { db, relations } from "../../../lib/mongo";
 import { ObjectId } from "mongodb";
 import type { Relation } from "../../../models/Relation";
 export const prerender = false;
+
+export const GET: APIRoute = async ({ params }) => {
+  const personId = new ObjectId(params.id)
+
+  const relations = await db.collection('relations').find({
+    $or: [{ from: personId }, { to: personId }]
+  }).toArray()
+
+  // Collecter tous les IDs liés
+  const linkedIds = relations.map(r =>
+    r.from.equals(personId) ? r.to : r.from
+  )
+
+  const persons = await db.collection('persons')
+    .find({ _id: { $in: linkedIds } })
+    .toArray()
+
+  const byId = Object.fromEntries(persons.map(p => [p._id.toString(), p]))
+
+  const parents   = relations
+    .filter(r => r.type === 'PARENT' && r.to.equals(personId))
+    .map(r => byId[r.from.toString()])
+    .filter(Boolean)
+
+  const enfants   = relations
+    .filter(r => r.type === 'PARENT' && r.from.equals(personId))
+    .map(r => byId[r.to.toString()])
+    .filter(Boolean)
+
+  const conjoints = relations
+    .filter(r => r.type === 'CONJOINT')
+    .map(r => byId[(r.from.equals(personId) ? r.to : r.from).toString()])
+    .filter(Boolean)
+
+  return new Response(JSON.stringify({ parents, enfants, conjoints }))
+}
 
 export const PATCH: APIRoute = async ({ request, params }) => {
   const body = await request.json();

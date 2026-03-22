@@ -1,11 +1,27 @@
 ---
 import DeleteButton from "../components/DeleteButton.astro";
 import Baselayout from "../layouts/Baselayout.astro";
-import { relations, persons } from "../lib/mongo";
+import { relations, persons, db } from "../lib/mongo";
 import { ObjectId } from "mongodb";
 import { formatFullName } from "../utils/formatName";
 import { formatDateFR } from "../utils/formatDate.ts";
+import { verifyToken } from "../lib/auth.ts";
 export const prerender = false;
+
+const token = Astro.cookies.get('token')?.value
+if (!token) return Astro.redirect('/login')
+
+let user: any   = null
+
+try {
+  const payload = verifyToken(token)
+  user   = await db.collection('users').findOne({ _id: new ObjectId(payload.userId) })
+ 
+} catch {
+  return Astro.redirect('/login')
+}
+
+
 
 const allRelations = await relations.find({}).toArray();
 
@@ -23,104 +39,142 @@ const conjointRels = allRelations.filter((r) => r.type === "CONJOINT");
 const parentRels   = allRelations.filter((r) => r.type === "PARENT");
 ---
 
-<Baselayout title="Toutes les relations">
-  <div class="max-w-6xl mx-auto">
+<Baselayout title="Relations">
+  <div class="max-w-4xl mx-auto px-6 py-8 space-y-6">
 
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-2xl font-bold text-gray-800">Liste des relations</h2>
-      <a
-        href="/addrelation"
-        class="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-blue-700 transition"
-      >
-        ➕ Ajouter une relation
+    <!-- En-tête -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">Relations</h1>
+        <p class="text-sm text-stone-500 mt-0.5">
+          {conjointRels.length} couple{conjointRels.length > 1 ? 's' : ''} · {parentRels.length} lien{parentRels.length > 1 ? 's' : ''} parent/enfant
+        </p>
+      </div>
+      <a href="/relations/add"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Ajouter
       </a>
     </div>
 
-    <!-- ── Barre de recherche & filtres ── -->
-    <div class="flex flex-wrap gap-3 items-center mb-6 p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
-      <input
-        id="search-input"
-        type="text"
-        placeholder="Rechercher par nom ou prénom..."
-        class="border rounded-lg px-3 py-1.5 text-sm text-gray-700 flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-300"
-      />
+    <!-- Filtres -->
+    <div class="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
+      <!-- Recherche -->
+      <div class="relative">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+        </svg>
+        <input id="search-input" type="text" placeholder="Rechercher par nom ou prénom…"
+          class="w-full pl-9 pr-4 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+      </div>
 
-      <!-- Filtre type de relation -->
-      <div class="flex gap-2">
-        <button data-filter="all"      class="filter-btn active text-xs font-semibold px-3 py-1.5 rounded-full border transition">
+      <!-- Boutons filtre -->
+      <div class="flex flex-wrap gap-2">
+        <button data-filter="all"
+          class="filter-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors">
           Tous
         </button>
-        <button data-filter="CONJOINT" class="filter-btn text-xs font-semibold px-3 py-1.5 rounded-full border transition">
-          💍 Couples
+        <button data-filter="CONJOINT"
+          class="filter-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors">
+          Couples
         </button>
-        <button data-filter="PARENT"   class="filter-btn text-xs font-semibold px-3 py-1.5 rounded-full border transition">
-          👨‍👧 Parent/Enfant
+        <button data-filter="PARENT"
+          class="filter-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors">
+          Parent / Enfant
         </button>
-      </div>
 
-      <!-- Filtre statut couple -->
-      <div class="flex gap-2" id="status-filters">
-        <button data-status="all"      class="status-btn active text-xs font-semibold px-3 py-1.5 rounded-full border transition">
-          Tous statuts
-        </button>
-        <button data-status="ACTIVE"   class="status-btn text-xs font-semibold px-3 py-1.5 rounded-full border transition">
-          ✅ En couple
-        </button>
-        <button data-status="DIVORCED" class="status-btn text-xs font-semibold px-3 py-1.5 rounded-full border transition">
-          ❌ Divorcé
-        </button>
-      </div>
+        <div class="w-px bg-stone-200 mx-1 self-stretch" id="status-divider"></div>
 
-      <span id="result-count" class="text-xs text-gray-400 ml-auto whitespace-nowrap"></span>
+        <div id="status-filters" class="flex gap-2">
+          <button data-status="all"
+            class="status-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors">
+            Tous statuts
+          </button>
+          <button data-status="ACTIVE"
+            class="status-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors">
+            En couple
+          </button>
+          <button data-status="DIVORCED"
+            class="status-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors">
+            Divorcé
+          </button>
+        </div>
+
+        <span id="result-count" class="ml-auto text-xs text-stone-400 self-center"></span>
+      </div>
     </div>
 
-    <!-- ── CONJOINTS ── -->
-    <section class="mb-8" id="section-conjoint">
-      <h3 class="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-3">
-        💍 Couples (<span class="conjoint-count">{conjointRels.length}</span>)
-      </h3>
-      <div class="flex flex-col gap-3" id="list-conjoint">
+    <!-- Section Couples -->
+    <section id="section-conjoint" class="space-y-2">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="w-6 h-6 rounded-md bg-pink-50 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+          </svg>
+        </div>
+        <h2 class="text-xs font-semibold text-stone-500 uppercase tracking-wider">
+          Couples · <span class="conjoint-count">{conjointRels.length}</span>
+        </h2>
+      </div>
+
+      <div class="space-y-2" id="list-conjoint">
         {conjointRels.map((r) => {
-          const from = personsMap[r.from.toString()];
-          const to   = personsMap[r.to.toString()];
+          const from     = personsMap[r.from.toString()];
+          const to       = personsMap[r.to.toString()];
           const fromName = `${from?.prenom ?? ''} ${from?.nom ?? ''}`.toLowerCase();
           const toName   = `${to?.prenom ?? ''} ${to?.nom ?? ''}`.toLowerCase();
           return (
             <div
-              class="rel-row bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+              class="rel-row bg-white border border-stone-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:border-stone-300 hover:shadow-sm transition group"
               data-type="CONJOINT"
               data-status={r.status ?? ''}
               data-search={`${fromName} ${toName}`}
             >
-              <span class={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${r.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {r.status === 'ACTIVE' ? '✅ En couple' : '❌ Divorcé'}
+              <!-- Badge statut -->
+              <span class={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
+                r.status === 'ACTIVE'
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-stone-100 text-stone-500 border border-stone-200'
+              }`}>
+                {r.status === 'ACTIVE' ? 'En couple' : 'Divorcé'}
               </span>
 
-              <div class="flex items-center gap-2 flex-1 font-medium text-gray-800">
-                <a href={`/person/${from?._id}`} class="hover:underline text-blue-600">
+              <!-- Noms -->
+              <div class="flex items-center gap-2 flex-1 text-sm font-medium text-stone-800">
+                <a href={`/person/${from?._id}`} class="hover:text-amber-700 transition-colors">
                   {formatFullName(from?.prenom, from?.nom)}
                 </a>
-                <span class="text-gray-300">↔</span>
-                <a href={`/person/${to?._id}`} class="hover:underline text-blue-600">
+                <svg class="w-4 h-4 text-stone-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h8M12 8l4 4-4 4"/>
+                </svg>
+                <a href={`/person/${to?._id}`} class="hover:text-amber-700 transition-colors">
                   {formatFullName(to?.prenom, to?.nom)}
                 </a>
               </div>
 
+              <!-- Dates -->
               {(r.dateDebut || r.dateFin) && (
-                <p class="text-xs text-gray-400 whitespace-nowrap">
+                <p class="text-xs text-stone-400 whitespace-nowrap">
                   {r.dateDebut && <>Depuis {formatDateFR(r.dateDebut)}</>}
-                  {r.dateFin && <> — {formatDateFR(r.dateFin)}</>}
+                  {r.dateFin   && <> — {formatDateFR(r.dateFin)}</>}
                 </p>
               )}
 
-              <div class="flex gap-3 sm:ml-auto">
-                <a
-                  href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
-                  class="text-amber-600 hover:underline text-sm font-medium"
-                >
-                  ✏️ Modifier
+              <!-- Actions -->
+              <div class="flex items-center gap-1 sm:ml-auto opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
+                <a href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
+                  class="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors" title="Modifier">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-1.414a2 2 0 01.586-1.414z"/>
+                  </svg>
                 </a>
-                <DeleteButton type="relation" id={r._id} />
+                <div class="p-1.5 rounded-lg text-stone-500 hover:text-red-500 hover:bg-red-50 transition-colors">
+                  <DeleteButton type="relation" id={r._id} />
+                </div>
               </div>
             </div>
           );
@@ -128,48 +182,63 @@ const parentRels   = allRelations.filter((r) => r.type === "PARENT");
       </div>
     </section>
 
-    <!-- ── PARENTS ── -->
-    <section id="section-parent">
-      <h3 class="text-lg font-semibold text-gray-600 uppercase tracking-wide mb-3">
-        👨‍👧 Relations parent / enfant (<span class="parent-count">{parentRels.length}</span>)
-      </h3>
-      <div class="flex flex-col gap-3" id="list-parent">
+    <!-- Section Parent/Enfant -->
+    <section id="section-parent" class="space-y-2">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="w-6 h-6 rounded-md bg-amber-50 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/>
+          </svg>
+        </div>
+        <h2 class="text-xs font-semibold text-stone-500 uppercase tracking-wider">
+          Parent / Enfant · <span class="parent-count">{parentRels.length}</span>
+        </h2>
+      </div>
+
+      <div class="space-y-2" id="list-parent">
         {parentRels.map((r) => {
-          const from = personsMap[r.from.toString()];
-          const to   = personsMap[r.to.toString()];
+          const from     = personsMap[r.from.toString()];
+          const to       = personsMap[r.to.toString()];
           const fromName = `${from?.prenom ?? ''} ${from?.nom ?? ''}`.toLowerCase();
           const toName   = `${to?.prenom ?? ''} ${to?.nom ?? ''}`.toLowerCase();
           return (
             <div
-              class="rel-row bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+              class="rel-row bg-white border border-stone-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:border-stone-300 hover:shadow-sm transition group"
               data-type="PARENT"
               data-status=""
               data-search={`${fromName} ${toName}`}
             >
-              <div class="flex items-center gap-1">
-                <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Parent</span>
-                <a href={`/person/${from?._id}`} class="font-medium text-blue-600 hover:underline">
-                  {formatFullName(from?.prenom, from?.nom)}
-                </a>
+              <div class="flex items-center gap-3 flex-1 text-sm">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs text-stone-400 font-medium uppercase tracking-wide">Parent</span>
+                  <a href={`/person/${from?._id}`} class="font-medium text-stone-800 hover:text-amber-700 transition-colors">
+                    {formatFullName(from?.prenom, from?.nom)}
+                  </a>
+                </div>
+                <svg class="w-4 h-4 text-stone-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                </svg>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs text-stone-400 font-medium uppercase tracking-wide">Enfant</span>
+                  <a href={`/person/${to?._id}`} class="font-medium text-stone-800 hover:text-amber-700 transition-colors">
+                    {formatFullName(to?.prenom, to?.nom)}
+                  </a>
+                </div>
               </div>
 
-              <span class="text-gray-300 hidden sm:inline">→</span>
-
-              <div class="flex items-center gap-1 flex-1">
-                <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Enfant</span>
-                <a href={`/person/${to?._id}`} class="font-medium text-blue-600 hover:underline">
-                  {formatFullName(to?.prenom, to?.nom)}
+              <!-- Actions -->
+              <div class="flex items-center gap-1 sm:ml-auto opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
+                <a href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
+                  class="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors" title="Modifier">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-1.414a2 2 0 01.586-1.414z"/>
+                  </svg>
                 </a>
-              </div>
-
-              <div class="flex gap-3 sm:ml-auto">
-                <a
-                  href={`/addrelation?id=${r._id}&returnUrl=${encodeURIComponent(Astro.url.pathname)}`}
-                  class="text-amber-600 hover:underline text-sm font-medium"
-                >
-                  ✏️ Modifier
-                </a>
-                <DeleteButton type="relation" id={r._id} />
+                <div class="p-1.5 rounded-lg text-stone-500 hover:text-red-500 hover:bg-red-50 transition-colors">
+                  <DeleteButton type="relation" id={r._id} />
+                </div>
               </div>
             </div>
           );
@@ -177,35 +246,44 @@ const parentRels   = allRelations.filter((r) => r.type === "PARENT");
       </div>
     </section>
 
-    <p id="no-results" class="hidden text-gray-400 text-sm mt-6 text-center">Aucune relation trouvée.</p>
+    <!-- Aucun résultat -->
+    <div id="no-results" class="hidden text-center py-12">
+      <div class="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+        </svg>
+      </div>
+      <p class="text-sm text-stone-400">Aucune relation trouvée</p>
+    </div>
 
   </div>
 </Baselayout>
 
 <style>
   .filter-btn, .status-btn {
-    background: #f8fafc;
-    color: #64748b;
-    border-color: #e2e8f0;
+    background: #fafaf9;
+    color: #78716c;
+    border-color: #e7e5e4;
   }
   .filter-btn:hover, .status-btn:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
+    background: #f5f5f4;
+    border-color: #a8a29e;
   }
   .filter-btn.active, .status-btn.active {
-    background: #1e293b;
-    color: #f1f5f9;
-    border-color: #1e293b;
+    background: #92400e;
+    color: #fef3c7;
+    border-color: #92400e;
   }
 </style>
 
 <script>
-  const searchInput   = document.getElementById('search-input') as HTMLInputElement;
-  const noResults     = document.getElementById('no-results') as HTMLElement;
-  const resultCount   = document.getElementById('result-count') as HTMLElement;
+  const searchInput   = document.getElementById('search-input')   as HTMLInputElement;
+  const noResults     = document.getElementById('no-results')     as HTMLElement;
+  const resultCount   = document.getElementById('result-count')   as HTMLElement;
+  const statusFilters = document.getElementById('status-filters') as HTMLElement;
+  const statusDivider = document.getElementById('status-divider') as HTMLElement;
   const filterBtns    = document.querySelectorAll<HTMLElement>('.filter-btn');
   const statusBtns    = document.querySelectorAll<HTMLElement>('.status-btn');
-  const statusFilters = document.getElementById('status-filters') as HTMLElement;
 
   let activeType   = 'all';
   let activeStatus = 'all';
@@ -213,15 +291,14 @@ const parentRels   = allRelations.filter((r) => r.type === "PARENT");
   function applyFilters() {
     const query = searchInput.value.toLowerCase().trim();
     const rows  = document.querySelectorAll<HTMLElement>('.rel-row');
-
     let visible = 0;
 
     rows.forEach(row => {
-      const type     = row.dataset.type   ?? '';
-      const status   = row.dataset.status ?? '';
-      const search   = row.dataset.search ?? '';
+      const type   = row.dataset.type   ?? '';
+      const status = row.dataset.status ?? '';
+      const search = row.dataset.search ?? '';
 
-      const matchType   = activeType === 'all'   || type === activeType;
+      const matchType   = activeType   === 'all' || type === activeType;
       const matchStatus = activeStatus === 'all' || status === activeStatus || type === 'PARENT';
       const matchSearch = !query || search.includes(query);
 
@@ -230,27 +307,25 @@ const parentRels   = allRelations.filter((r) => r.type === "PARENT");
       if (show) visible++;
     });
 
-    // Masquer les sections entièrement vides
-    updateSectionVisibility('CONJOINT', 'section-conjoint', 'conjoint-count');
-    updateSectionVisibility('PARENT',   'section-parent',   'parent-count');
+    updateSection('CONJOINT', 'section-conjoint', 'conjoint-count');
+    updateSection('PARENT',   'section-parent',   'parent-count');
 
-    // Afficher/masquer les filtres de statut selon le type actif
-    statusFilters.style.display = activeType === 'PARENT' ? 'none' : '';
+    const showStatus = activeType !== 'PARENT';
+    statusFilters.style.display = showStatus ? '' : 'none';
+    statusDivider.style.display = showStatus ? '' : 'none';
 
     resultCount.textContent = `${visible} résultat${visible > 1 ? 's' : ''}`;
     noResults.classList.toggle('hidden', visible > 0);
   }
 
-  function updateSectionVisibility(type: string, sectionId: string, countClass: string) {
+  function updateSection(type: string, sectionId: string, countClass: string) {
     const section = document.getElementById(sectionId)!;
-    const rows    = section.querySelectorAll<HTMLElement>('.rel-row');
-    const visibleCount = Array.from(rows).filter(r => r.style.display !== 'none').length;
-
-    section.style.display = visibleCount === 0 ? 'none' : '';
-    section.querySelector(`.${countClass}`)!.textContent = String(visibleCount);
+    const count   = Array.from(section.querySelectorAll<HTMLElement>('.rel-row'))
+      .filter(r => r.style.display !== 'none').length;
+    section.style.display = count === 0 ? 'none' : '';
+    section.querySelector(`.${countClass}`)!.textContent = String(count);
   }
 
-  // Boutons filtre type
   filterBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       filterBtns.forEach(b => b.classList.remove('active'));
@@ -260,7 +335,6 @@ const parentRels   = allRelations.filter((r) => r.type === "PARENT");
     });
   });
 
-  // Boutons filtre statut
   statusBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       statusBtns.forEach(b => b.classList.remove('active'));
@@ -271,7 +345,5 @@ const parentRels   = allRelations.filter((r) => r.type === "PARENT");
   });
 
   searchInput.addEventListener('input', applyFilters);
-
-  // Init compteur
   applyFilters();
 </script>

@@ -341,71 +341,92 @@ function lineFromY(fromId: string, coParentId: string | null): number {
 
 <style>
   .tree-wrapper {
-    background: #f8fafc; border: 1px solid #e2e8f0;
-    border-radius: 12px; padding: 1rem; overflow: hidden;
+    background: #fafaf9;
+    border: 1px solid #e7e5e4;
+    border-radius: 12px;
+    padding: 1rem;
+    overflow: hidden;
   }
-  .tree-scroll { overflow: auto; padding-top: 50px; }
-  .tree-canvas { position: relative; }
-  .tree-svg { position: absolute; top:0; left:0; pointer-events:none; overflow:visible; z-index:0; }
+  .tree-scroll  { overflow: auto; padding-top: 50px; }
+  .tree-canvas  { position: relative; }
+  .tree-svg     { position: absolute; top:0; left:0; pointer-events:none; overflow:visible; z-index:0; }
 
-  .couple-node { position: absolute; display: flex; align-items: center; z-index: 1; }
+  .couple-node  { position: absolute; display: flex; align-items: center; z-index: 1; }
 
-  .sep { font-size:.75rem; color:#f43f5e; padding:0 5px; flex-shrink:0; width:14px; text-align:center; }
-  .sep--divorced { color:#94a3b8; font-size:.9rem; }
+  /* ── Séparateur ── */
+  .sep           { font-size:.75rem; color:#f43f5e; padding:0 5px; flex-shrink:0; width:14px; text-align:center; }
+  .sep--divorced { color:#a8a29e; font-size:.9rem; }
 
+  /* ── Carte de base ── */
   .card {
-    position:relative; box-sizing:border-box;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:0 .6rem; gap:2px;
-    border:1px solid #e2e8f0; border-radius:8px; background:#fff;
-    box-shadow:0 1px 3px rgba(0,0,0,.06);
-    text-decoration:none; flex-shrink:0;
-    transition:border-color .15s, box-shadow .15s, transform .15s;
+    position: relative; box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0 .6rem; gap: 2px;
+    border: 1px solid #e7e5e4; border-radius: 10px; background: #fff;
+    box-shadow: 0 1px 3px rgba(28,25,23,.06);
+    text-decoration: none; flex-shrink: 0;
+    transition: border-color .15s, box-shadow .15s, transform .15s;
   }
-  .card:hover { border-color:#93c5fd; box-shadow:0 4px 12px rgba(59,130,246,.12); transform:translateY(-1px); z-index:3; }
+  .card:hover {
+    border-color: #d97706;
+    box-shadow: 0 4px 12px rgba(180,83,9,.12);
+    transform: translateY(-1px);
+    z-index: 3;
+  }
 
-  .card--hub { border-color:#93c5fd; box-shadow:0 0 0 2px rgba(147,197,253,.35); }
-  .card--hub:hover { box-shadow:0 4px 12px rgba(59,130,246,.2); }
+  /* ── Racine ── */
+  .card--root               { background: #78350f; border-color: #78350f; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  .card--root:hover         { border-color: #92400e; box-shadow: 0 4px 12px rgba(120,53,15,.3); }
+  .card--root .card__prenom { color: #d97706; }
+  .card--root .card__nom    { color: #fef3c7; }
 
-  .card--self { background:#f8fafc; border-color:#cbd5e1; border-style:dashed; opacity:.75; }
-  .card--self:hover { opacity:1; border-color:#93c5fd; }
-  .card--self .card__prenom { color:#94a3b8; }
-  .card--self .card__nom    { color:#475569; }
+  /* ── Hub (multi-union) ── */
+  .card--hub       { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251,191,36,.25); }
+  .card--hub:hover { box-shadow: 0 4px 12px rgba(180,83,9,.2); }
 
-  .card--root { background:#1e293b; border-color:#1e293b; box-shadow:0 2px 8px rgba(0,0,0,.2); }
-  .card--root:hover { border-color:#334155; }
-  .card--conjoint { background:#fff0f3; border-color:#fecdd3; }
-  .card--conjoint:hover { border-color:#f43f5e; }
-  .card--divorced { background:#f8fafc; border-color:#cbd5e1; border-style:dashed; }
-  .card--divorced:hover { border-color:#94a3b8; }
-  .card--deceased { background:#334155; border-color:#1e293b; }
-  .card--deceased::after { content:'✝'; position:absolute; top:3px; right:5px; font-size:.5rem; color:#64748b; }
-  .card--deceased:hover { border-color:#475569; }
+  /* ── Self dans multi-union ── */
+  .card--self               { background: #fafaf9; border-color: #d6d3d1; border-style: dashed; opacity: .75; }
+  .card--self:hover         { opacity:1; border-color: #d97706; }
+  .card--self .card__prenom { color: #a8a29e; }
+  .card--self .card__nom    { color: #57534e; }
+  .card--self:hover .card__nom { color: #1c1917; }
 
-  .card__prenom { font-size:.7rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
-  .card__nom    { font-size:.8rem; font-weight:600; color:#0f172a; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
-  .card__date   { font-size:.58rem; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; line-height:1; }
+  /* ── Conjoint ── */
+  .card--conjoint               { background: #fff7ed; border-color: #fed7aa; }
+  .card--conjoint:hover         { border-color: #d97706; }
+  .card--conjoint .card__prenom { color: #c2410c; }
+  .card--conjoint .card__nom    { color: #9a3412; }
 
-  .card--root .card__prenom     { color:#94a3b8; }
-  .card--root .card__nom        { color:#f1f5f9; }
-  .card--conjoint .card__prenom { color:#9f1239; }
-  .card--conjoint .card__nom    { color:#881337; }
-  .card--divorced .card__prenom { color:#94a3b8; }
-  .card--divorced .card__nom    { color:#64748b; }
-  .card--deceased .card__prenom { color:#94a3b8; }
-  .card--deceased .card__nom    { color:#e2e8f0; }
-  .card--deceased .card__date   { color:#64748b; }
+  /* ── Divorcé ── */
+  .card--divorced               { background: #fafaf9; border-color: #d6d3d1; border-style: dashed; }
+  .card--divorced:hover         { border-color: #a8a29e; }
+  .card--divorced .card__prenom { color: #a8a29e; }
+  .card--divorced .card__nom    { color: #78716c; }
 
-  .card:hover .card__nom           { color:#2563eb; }
-  .card--root:hover .card__nom     { color:#93c5fd; }
-  .card--deceased:hover .card__nom { color:#f1f5f9; }
-  .card--self:hover .card__nom     { color:#1e293b; }
+  /* ── Décédé ── */
+  .card--deceased               { background: #292524; border-color: #1c1917; }
+  .card--deceased:hover         { border-color: #44403c; }
+  .card--deceased .card__prenom { color: #78716c; }
+  .card--deceased .card__nom    { color: #e7e5e4; }
+  .card--deceased .card__date   { color: #57534e; }
+  .card--deceased::after        { content:'†'; position:absolute; top:3px; right:5px; font-size:.5rem; color:#57534e; }
+  .card--deceased:hover .card__nom { color: #fafaf9; }
 
+  /* ── Textes généraux ── */
+  .card__prenom { font-size:.7rem;  color:#78716c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
+  .card__nom    { font-size:.8rem;  font-weight:600; color:#1c1917; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
+  .card__date   { font-size:.58rem; color:#a8a29e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; line-height:1; }
+
+  .card:hover .card__nom        { color: #92400e; }
+  .card--root:hover .card__nom  { color: #fde68a; }
+
+  /* ── Bouton ancêtre ── */
   .ancestor-btn {
-    position:absolute; font-size:.65rem; font-weight:500;
-    color:#64748b; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:9999px;
-    padding:.15rem .6rem; text-decoration:none; white-space:nowrap; z-index:2;
-    transition:background .15s, color .15s, border-color .15s;
+    position: absolute; font-size: .65rem; font-weight: 500;
+    color: #78716c; background: #fafaf9; border: 1px solid #d6d3d1;
+    border-radius: 9999px; padding: .15rem .6rem;
+    text-decoration: none; white-space: nowrap; z-index: 2;
+    transition: background .15s, color .15s, border-color .15s;
   }
-  .ancestor-btn:hover { background:#1e293b; color:#f1f5f9; border-color:#1e293b; }
+  .ancestor-btn:hover { background: #78350f; color: #fef3c7; border-color: #78350f; }
 </style>
