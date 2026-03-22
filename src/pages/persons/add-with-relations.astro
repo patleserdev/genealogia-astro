@@ -1,0 +1,506 @@
+---
+import { ObjectId } from "mongodb";
+import Baselayout from "../../layouts/Baselayout.astro";
+import { verifyToken } from "../../lib/auth.ts";
+import { db, persons as personsCol, relations as relationsCol } from "../../lib/mongo";
+import { formatFullName } from "../../utils/formatName.ts";
+
+export const prerender = false;
+
+const token = Astro.cookies.get('token')?.value
+if (!token) return Astro.redirect('/login')
+
+let user: any   = null
+
+try {
+  const payload = verifyToken(token)
+  user   = await db.collection('users').findOne({ _id: new ObjectId(payload.userId) })
+ 
+} catch {
+  return Astro.redirect('/login')
+}
+
+
+const persons = await personsCol.find({ active: true }).toArray();
+const coupleRelations = await relationsCol.find({ type: "CONJOINT" }).toArray();
+
+function isMajeur(dateNaissance?: string): boolean {
+  if (!dateNaissance) return true;
+  const birth = new Date(dateNaissance);
+  const majority = new Date(birth);
+  majority.setFullYear(majority.getFullYear() + 18);
+  return majority <= new Date();
+}
+
+const personsData = persons
+  .map((p) => ({
+    _id: p._id!.toString(),
+    prenom: p.prenom,
+    nom: p.nom,
+    majeur: isMajeur(p.dateNaissance),
+  }))
+  .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+
+const coupleRelationsData = coupleRelations.map((r) => {
+  const p1 = personsData.find((p) => p._id === r.from.toString());
+  const p2 = personsData.find((p) => p._id === r.to.toString());
+  return {
+    _id: r._id!.toString(),
+    fromId: r.from.toString(),
+    toId: r.to.toString(),
+    label: p1 && p2
+      ? `${formatFullName(p1.prenom, p1.nom)} & ${formatFullName(p2.prenom, p2.nom)}`
+      : r._id!.toString(),
+  };
+});
+---
+
+<Baselayout title="Nouvelle personne">
+  <div class="max-w-4xl mx-auto px-6 py-8">
+
+    <!-- En-tête -->
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">Nouvelle personne</h1>
+        <p class="text-sm text-stone-500 mt-0.5">Renseignez les informations et les relations</p>
+      </div>
+      <a href="/persons"
+        class="inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-800 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Retour
+      </a>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+
+      <!-- Colonne principale (2/3) -->
+      <div class="lg:col-span-2 space-y-5">
+
+        <!-- Infos personnelles -->
+        <div class="bg-white border border-stone-200 rounded-xl p-5 space-y-4">
+          <h2 class="text-xs font-semibold text-stone-500 uppercase tracking-wider">Informations personnelles</h2>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-stone-500 mb-1">Prénom <span class="text-red-400">*</span></label>
+              <input type="text" id="prenom" placeholder="Jean"
+                class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+            </div>
+            <div>
+              <label class="block text-xs text-stone-500 mb-1">Nom <span class="text-red-400">*</span></label>
+              <input type="text" id="nom" placeholder="Dupont"
+                class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-stone-500 mb-1">Date de naissance</label>
+              <input type="date" id="dateNaissance"
+                class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+            </div>
+            <div>
+              <label class="block text-xs text-stone-500 mb-1">Date de décès</label>
+              <input type="date" id="dateDeces"
+                class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-stone-500 mb-1">Sexe</label>
+              <select id="sexe"
+                class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition">
+                <option value="">— Non renseigné —</option>
+                <option value="M">Homme</option>
+                <option value="F">Femme</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-stone-500 mb-1">Email</label>
+              <input type="email" id="email" placeholder="jean@exemple.com"
+                class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Relations -->
+        <div class="bg-white border border-stone-200 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-semibold text-stone-500 uppercase tracking-wider">Relations</h2>
+            <button type="button" id="btnAddRelation"
+              class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-800 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              Ajouter une relation
+            </button>
+          </div>
+
+          <div id="relationsContainer" class="space-y-3"></div>
+
+          <p id="noRelations" class="text-sm text-stone-400 italic text-center py-4">
+            Aucune relation ajoutée
+          </p>
+        </div>
+
+        <!-- Erreur globale -->
+        <p id="errorMsg" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></p>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-3">
+          <button id="btnSubmit" type="button"
+            class="flex-1 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+            Créer la personne
+          </button>
+          <a href="/persons"
+            class="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-medium rounded-lg transition-colors">
+            Annuler
+          </a>
+        </div>
+
+      </div>
+
+      <!-- Panneau résumé (1/3) -->
+      <div>
+        <div class="bg-white border border-stone-200 rounded-xl p-5 sticky top-20 space-y-4">
+          <h2 class="text-xs font-semibold text-stone-500 uppercase tracking-wider">Aperçu</h2>
+
+          <!-- Avatar + nom -->
+          <div class="flex items-center gap-3">
+            <div id="previewAvatar"
+              class="w-12 h-12 rounded-full bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+              </svg>
+            </div>
+            <div>
+              <p id="previewName" class="text-sm font-medium text-stone-400 italic">Prénom Nom</p>
+              <p id="previewMeta" class="text-xs text-stone-400 mt-0.5"></p>
+            </div>
+          </div>
+
+          <div class="h-px bg-stone-100"></div>
+
+          <!-- Compteur relations -->
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-stone-500">Relations</span>
+            <span id="previewRelCount" class="text-xs font-medium text-stone-800">0</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TEMPLATE relation row -->
+  <template id="relationTemplate">
+    <div class="relation-row border border-stone-200 rounded-xl p-4 space-y-3 bg-stone-50" data-type="CONJOINT" data-person-id="">
+
+      <!-- Header row -->
+      <div class="flex items-center justify-between">
+        <div class="flex gap-1.5">
+          <button type="button" data-type="CONJOINT"
+            class="type-btn px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+            Conjoint
+          </button>
+          <button type="button" data-type="PARENT"
+            class="type-btn px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/>
+            </svg>
+            Parent de
+          </button>
+          <button type="button" data-type="ENFANT"
+            class="type-btn px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+            Enfant de
+          </button>
+        </div>
+        <button type="button" class="btn-remove p-1 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Recherche personne -->
+      <div class="relative">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+        </svg>
+        <input type="text" placeholder="Rechercher une personne…" autocomplete="off"
+          class="person-search w-full pl-8 pr-3 py-2 rounded-lg border border-stone-200 bg-white text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+        <ul class="person-results absolute z-10 mt-1 w-full bg-white border border-stone-200 rounded-xl shadow-md hidden max-h-40 overflow-y-auto divide-y divide-stone-100"></ul>
+        <p class="person-selected hidden mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5"></p>
+      </div>
+
+      <!-- Options CONJOINT -->
+      <div class="options-conjoint space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs text-stone-500 mb-1">Statut</label>
+            <select class="conjoint-status w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition">
+              <option value="ACTIVE">En couple</option>
+              <option value="DIVORCED">Divorcé</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-stone-500 mb-1">Date début</label>
+            <input type="date" class="conjoint-date-debut w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Options PARENT/ENFANT -->
+      <div class="options-parent hidden">
+        <label class="block text-xs text-stone-500 mb-1">Couple associé <span class="text-stone-400">(optionnel)</span></label>
+        <select class="couple-relation-id w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition">
+          <option value="">— Aucun couple —</option>
+        </select>
+      </div>
+    </div>
+  </template>
+</Baselayout>
+
+<style>
+  .type-btn {
+    background: #fafaf9;
+    color: #78716c;
+    border-color: #e7e5e4;
+  }
+  .type-btn:hover {
+    background: #f5f5f4;
+    border-color: #a8a29e;
+  }
+  .type-btn.active {
+    background: #fffbeb;
+    color: #92400e;
+    border-color: #d97706;
+  }
+</style>
+
+<script define:vars={{ personsData, coupleRelationsData }}>
+  const container   = document.getElementById("relationsContainer");
+  const noRelations = document.getElementById("noRelations");
+  const template    = document.getElementById("relationTemplate");
+  const previewName = document.getElementById("previewName");
+  const previewMeta = document.getElementById("previewMeta");
+  const previewAvatar    = document.getElementById("previewAvatar");
+  const previewRelCount  = document.getElementById("previewRelCount");
+
+  // ── Aperçu live ───────────────────────────────────────────────────────
+  function updatePreview() {
+    const prenom = document.getElementById("prenom").value.trim();
+    const nom    = document.getElementById("nom").value.trim();
+    const sexe   = document.getElementById("sexe").value;
+    const dob    = document.getElementById("dateNaissance").value;
+
+    if (prenom || nom) {
+      previewName.textContent = `${prenom || '…'} ${nom || '…'}`;
+      previewName.className   = "text-sm font-medium text-stone-800";
+      previewAvatar.innerHTML = `<span class="text-sm font-semibold text-amber-700">${(prenom.charAt(0) || '?').toUpperCase()}${(nom.charAt(0) || '').toUpperCase()}</span>`;
+      previewAvatar.className = "w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0";
+    } else {
+      previewName.textContent = "Prénom Nom";
+      previewName.className   = "text-sm font-medium text-stone-400 italic";
+      previewAvatar.innerHTML = `<svg class="w-5 h-5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>`;
+      previewAvatar.className = "w-12 h-12 rounded-full bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0";
+    }
+
+    const metas = []
+    if (sexe === 'M') metas.push('Homme')
+    if (sexe === 'F') metas.push('Femme')
+    if (sexe === 'Autre') metas.push('Autre')
+    if (dob) metas.push(`Né(e) le ${dob}`)
+    previewMeta.textContent = metas.join(' · ')
+
+    previewRelCount.textContent = String(container.children.length);
+  }
+
+  document.getElementById("prenom").addEventListener("input", updatePreview);
+  document.getElementById("nom").addEventListener("input",    updatePreview);
+  document.getElementById("sexe").addEventListener("change",  updatePreview);
+  document.getElementById("dateNaissance").addEventListener("change", updatePreview);
+
+  function updateNoRelations() {
+    noRelations.classList.toggle("hidden", container.children.length > 0);
+    updatePreview();
+  }
+
+  // ── Setup relation row ────────────────────────────────────────────────
+  function setupRelationRow(row) {
+    const typeBtns        = row.querySelectorAll(".type-btn");
+    const optionsConjoint = row.querySelector(".options-conjoint");
+    const optionsParent   = row.querySelector(".options-parent");
+    const searchInput     = row.querySelector(".person-search");
+    const resultsList     = row.querySelector(".person-results");
+    const personSelected  = row.querySelector(".person-selected");
+    const coupleSelect    = row.querySelector(".couple-relation-id");
+
+    // Activer CONJOINT par défaut
+    typeBtns[0].classList.add("active");
+
+    typeBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const t = btn.dataset.type;
+        row.dataset.type = t;
+        typeBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        optionsConjoint.classList.toggle("hidden", t !== "CONJOINT");
+        optionsParent.classList.toggle("hidden",   t === "CONJOINT");
+        updateCoupleOptions(row.dataset.personId);
+      });
+    });
+
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.toLowerCase().trim();
+      resultsList.innerHTML = "";
+      if (!q) { resultsList.classList.add("hidden"); return; }
+
+      const matches = personsData
+        .filter(p => `${p.prenom} ${p.nom}`.toLowerCase().includes(q))
+        .slice(0, 8);
+
+      if (!matches.length) { resultsList.classList.add("hidden"); return; }
+
+      matches.forEach(p => {
+        const li = document.createElement("li");
+        li.className = "px-4 py-2.5 hover:bg-amber-50 cursor-pointer text-sm text-stone-700 flex items-center gap-3";
+        li.innerHTML = `
+          <span class="w-6 h-6 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-xs font-medium text-amber-700 shrink-0">
+            ${p.prenom.charAt(0)}${p.nom.charAt(0)}
+          </span>
+          <span>${p.prenom} ${p.nom}</span>`;
+        li.addEventListener("click", () => {
+          row.dataset.personId = p._id;
+          personSelected.textContent = `✓ ${p.prenom} ${p.nom}`;
+          personSelected.classList.remove("hidden");
+          searchInput.value = `${p.prenom} ${p.nom}`;
+          resultsList.classList.add("hidden");
+          updateCoupleOptions(p._id);
+        });
+        resultsList.appendChild(li);
+      });
+      resultsList.classList.remove("hidden");
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!searchInput.contains(e.target) && !resultsList.contains(e.target))
+        resultsList.classList.add("hidden");
+    });
+
+    function updateCoupleOptions(personId) {
+      coupleSelect.innerHTML = '<option value="">— Aucun couple —</option>';
+      const filtered = personId
+        ? coupleRelationsData.filter(c => c.fromId === personId || c.toId === personId)
+        : coupleRelationsData;
+      filtered.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c._id;
+        opt.textContent = c.label;
+        coupleSelect.appendChild(opt);
+      });
+      if (filtered.length === 1) coupleSelect.value = filtered[0]._id;
+    }
+    updateCoupleOptions();
+
+    row.querySelector(".btn-remove").addEventListener("click", () => {
+      row.remove();
+      updateNoRelations();
+    });
+  }
+
+  document.getElementById("btnAddRelation").addEventListener("click", () => {
+    const clone = template.content.cloneNode(true);
+    container.appendChild(clone);
+    setupRelationRow(container.lastElementChild);
+    updateNoRelations();
+  });
+
+  // ── Submit ────────────────────────────────────────────────────────────
+  document.getElementById("btnSubmit").addEventListener("click", async () => {
+    const prenom   = document.getElementById("prenom").value.trim();
+    const nom      = document.getElementById("nom").value.trim();
+    const errorMsg = document.getElementById("errorMsg");
+
+    if (!prenom || !nom) {
+      errorMsg.textContent = "Le prénom et le nom sont obligatoires.";
+      errorMsg.classList.remove("hidden");
+      return;
+    }
+    errorMsg.classList.add("hidden");
+
+    const btn = document.getElementById("btnSubmit");
+    btn.disabled    = true;
+    btn.textContent = "Création en cours…";
+
+    const personRes = await fetch("/api/persons", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        prenom,
+        nom,
+        sexe:          document.getElementById("sexe").value          || undefined,
+        dateNaissance: document.getElementById("dateNaissance").value  || undefined,
+        dateDeces:     document.getElementById("dateDeces").value      || undefined,
+        email:         document.getElementById("email").value          || undefined,
+        active: true,
+      }),
+    });
+
+    if (!personRes.ok) {
+      errorMsg.textContent = "Erreur lors de la création de la personne.";
+      errorMsg.classList.remove("hidden");
+      btn.disabled    = false;
+      btn.textContent = "Créer la personne";
+      return;
+    }
+
+    const { _id: newPersonId } = await personRes.json();
+
+    const rows = container.querySelectorAll(".relation-row");
+    for (const row of rows) {
+      const type     = row.dataset.type;
+      const personId = row.dataset.personId;
+      if (!personId) continue;
+
+      const payload = type === "CONJOINT"
+        ? {
+            type: "CONJOINT",
+            from: newPersonId,
+            to:   personId,
+            status:    row.querySelector(".conjoint-status").value,
+            dateDebut: row.querySelector(".conjoint-date-debut").value || null,
+          }
+        : {
+            type: "PARENT",
+            from: type === "PARENT" ? newPersonId : personId,
+            to:   type === "PARENT" ? personId    : newPersonId,
+            ...(row.querySelector(".couple-relation-id").value
+              ? { coupleRelationId: row.querySelector(".couple-relation-id").value }
+              : {}),
+          };
+
+      await fetch("/api/relations", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+    }
+
+    window.location.href = `/person/${newPersonId}`;
+  });
+</script>

@@ -1,0 +1,432 @@
+---
+import { formatDateFR } from "../utils/formatDate.ts";
+
+const { node, parentId } = Astro.props;
+
+const CARD_W      = 160;
+const CARD_H      = 64;
+const SEP_W       = 24;
+const PAIR_W      = CARD_W * 2 + SEP_W;
+const V_GAP       = 80;
+const H_GAP       = 32;
+const HUB_GAP     = 60;
+const UNION_H_GAP = 48;
+const PADDING     = 60;
+
+interface Person {
+  _id: string;
+  prenom: string;
+  nom: string;
+  dateNaissance?: string | null;
+  dateDeces?: string | null;
+  unionStatus?: string | null;
+}
+interface ChildGroup { coParent: Person | null; children: TreeNode[]; }
+interface TreeNode {
+  person: Person;
+  conjoint?: Person | null;
+  childGroups?: ChildGroup[];
+}
+
+interface UnionInfo {
+  coParent: Person | null;
+  children: TreeNode[];
+  isDivorced: boolean;
+}
+
+function getUnions(n: TreeNode): UnionInfo[] {
+  const out: UnionInfo[] = [];
+  const seen = new Set<string>();
+  for (const g of (n.childGroups ?? [])) {
+    if (g.coParent) seen.add(g.coParent._id);
+    out.push({ coParent: g.coParent, children: g.children, isDivorced: g.coParent?.unionStatus === 'DIVORCED' });
+  }
+  if (n.conjoint && !seen.has(n.conjoint._id)) {
+    out.push({ coParent: n.conjoint, children: [], isDivorced: n.conjoint.unionStatus === 'DIVORCED' });
+  }
+  return out;
+}
+
+function unionBlockWidth(u: UnionInfo): number {
+  const pairW = u.coParent ? PAIR_W : CARD_W;
+  if (u.children.length === 0) return pairW;
+  const childrenW = u.children.reduce((s, c) => s + subtreeWidth(c), 0)
+    + H_GAP * (u.children.length - 1);
+  return Math.max(pairW, childrenW);
+}
+
+function subtreeWidth(n: TreeNode): number {
+  const unions = getUnions(n);
+  if (unions.length === 0) return CARD_W;
+  if (unions.length === 1) {
+    const ow = unions[0].coParent ? PAIR_W : CARD_W;
+    if (unions[0].children.length === 0) return ow;
+    const childrenW = unions[0].children.reduce((s, c) => s + subtreeWidth(c), 0)
+      + H_GAP * (unions[0].children.length - 1);
+    return Math.max(ow, childrenW);
+  }
+  // multi-union
+  const unionsRow = unions.reduce((s, u) => s + unionBlockWidth(u), 0)
+    + UNION_H_GAP * (unions.length - 1);
+  return Math.max(CARD_W, unionsRow);
+}
+
+interface PositionedNode {
+  person: Person;
+  unions: UnionInfo[];
+  x: number;
+  y: number;
+  unionPairs?: { union: UnionInfo; pairX: number; pairY: number }[];
+}
+
+function layoutTree(n: TreeNode, x = 0, y = 0): PositionedNode[] {
+  const unions = getUnions(n);
+  const result: PositionedNode[] = [];
+
+  if (unions.length <= 1) {
+    const union    = unions[0] ?? null;
+    const ow       = union?.coParent ? PAIR_W : CARD_W;
+    const children = union?.children ?? [];
+
+    if (children.length === 0) {
+      result.push({ person: n.person, unions, x, y });
+      return result;
+    }
+
+    let childrenTotalW = children.reduce((s, c) => s + subtreeWidth(c), 0)
+      + H_GAP * (children.length - 1);
+    let currentX = x + Math.max(0, (ow - childrenTotalW) / 2);
+    const childLayouts: PositionedNode[][] = [];
+    for (const c of children) {
+      const cl = layoutTree(c, currentX, y + CARD_H + V_GAP);
+      childLayouts.push(cl);
+      currentX += subtreeWidth(c) + H_GAP;
+    }
+    const firstX  = childLayouts[0][0].x;
+    const lastPos = childLayouts[childLayouts.length - 1][0];
+    const lastOw  = subtreeWidth(lastPos.person as unknown as TreeNode);
+    const parentX = firstX + (lastPos.x + lastOw - firstX) / 2 - ow / 2;
+
+    result.push({ person: n.person, unions, x: parentX, y });
+    result.push(...childLayouts.flat());
+    return result;
+  }
+
+  // ── Multi-union ──────────────────────────────────────────────────────────
+  const totalUnionsW = unions.reduce((s, u) => s + unionBlockWidth(u), 0)
+    + UNION_H_GAP * (unions.length - 1);
+
+  const hubX = x + totalUnionsW / 2 - CARD_W / 2;
+  const unionsRowY = y + CARD_H + HUB_GAP;
+
+  let currentUX = x;
+  const unionPairs: { union: UnionInfo; pairX: number; pairY: number }[] = [];
+  const allChildLayouts: PositionedNode[][] = [];
+
+  for (const u of unions) {
+    const bw    = unionBlockWidth(u);
+    const pairW = u.coParent ? PAIR_W : CARD_W;
+    const pairX = currentUX + (bw - pairW) / 2;
+    unionPairs.push({ union: u, pairX, pairY: unionsRowY });
+
+    if (u.children.length > 0) {
+      let childCurrentX = currentUX;
+      for (const c of u.children) {
+        const cl = layoutTree(c, childCurrentX, unionsRowY + CARD_H + V_GAP);
+        allChildLayouts.push(cl);
+        childCurrentX += subtreeWidth(c) + H_GAP;
+      }
+    }
+    currentUX += bw + UNION_H_GAP;
+  }
+
+  result.push({ person: n.person, unions, x: hubX, y, unionPairs });
+  result.push(...allChildLayouts.flat());
+  return result;
+}
+
+interface LineSpec { fromId: string; toId: string; coParentId: string | null; }
+
+function collectLines(n: TreeNode): LineSpec[] {
+  const lines: LineSpec[] = [];
+  for (const g of (n.childGroups ?? [])) {
+    for (const c of g.children) {
+      lines.push({ fromId: n.person._id, toId: c.person._id, coParentId: g.coParent?._id ?? null });
+      lines.push(...collectLines(c));
+    }
+  }
+  return lines;
+}
+
+const positions = layoutTree(node);
+const posMap    = new Map(positions.map(p => [p.person._id, p]));
+const lines     = collectLines(node);
+
+const svgW = Math.max(...positions.map(p => {
+  if (p.unionPairs?.length) {
+    const last = p.unionPairs[p.unionPairs.length - 1];
+    return last.pairX + (last.union.coParent ? PAIR_W : CARD_W);
+  }
+  const ow = p.unions[0]?.coParent ? PAIR_W : CARD_W;
+  return p.x + ow;
+})) + PADDING * 2;
+
+const svgH = Math.max(...positions.map(p =>
+  p.unionPairs?.length ? p.unionPairs[0].pairY : p.y
+)) + CARD_H + PADDING * 2 + 40;
+
+const depths: Record<string, number> = {};
+function computeDepths(n: TreeNode, d = 0) {
+  depths[n.person._id] = d;
+  for (const g of (n.childGroups ?? []))
+    for (const c of g.children) computeDepths(c, d + 1);
+}
+computeDepths(node);
+
+function lineFromX(fromId: string, coParentId: string | null): number {
+  const p = posMap.get(fromId);
+  if (!p) return 0;
+  if (!p.unionPairs?.length) {
+    const ow = p.unions[0]?.coParent ? PAIR_W : CARD_W;
+    return p.x + PADDING + ow / 2;
+  }
+  const pair = p.unionPairs.find(up => up.union.coParent?._id === coParentId);
+  if (!pair) return p.x + PADDING + CARD_W / 2;
+  const pw = pair.union.coParent ? PAIR_W : CARD_W;
+  return pair.pairX + PADDING + pw / 2;
+}
+
+function lineFromY(fromId: string, coParentId: string | null): number {
+  const p = posMap.get(fromId);
+  if (!p) return 0;
+  if (!p.unionPairs?.length) return p.y + PADDING + CARD_H;
+  const pair = p.unionPairs.find(up => up.union.coParent?._id === coParentId);
+  return (pair?.pairY ?? p.y) + PADDING + CARD_H;
+}
+---
+
+<div class="tree-wrapper">
+  <div class="tree-scroll">
+    <div class="tree-canvas" style={`width:${svgW}px;height:${svgH}px;`}>
+
+      {(() => {
+        if (!parentId) return null;
+        const root = positions.find(p => depths[p.person._id] === 0);
+        if (!root) return null;
+        return (
+          <a href={`/tree/${parentId}`} class="ancestor-btn"
+            style={`left:${root.x + PADDING + CARD_W / 2}px;top:${root.y + PADDING - 30}px;transform:translateX(-50%);`}>
+            ↑ parent
+          </a>
+        );
+      })()}
+
+      <svg width={svgW} height={svgH} class="tree-svg" aria-hidden="true">
+
+        {lines.map(({ fromId, toId, coParentId }) => {
+          const child  = posMap.get(toId);
+          if (!child) return null;
+          const childOw = child.unions[0]?.coParent ? PAIR_W : CARD_W;
+          const x1  = lineFromX(fromId, coParentId);
+          const y1  = lineFromY(fromId, coParentId);
+          const x2  = child.x + PADDING + childOw / 2;
+          const y2  = child.y + PADDING;
+          const mid = (y1 + y2) / 2;
+          return (
+            <path d={`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`}
+              fill="none" stroke="#94a3b8" stroke-width="1.5" />
+          );
+        })}
+
+        {positions.filter(p => p.unionPairs?.length).map(p =>
+          p.unionPairs!.map(({ union, pairX, pairY }) => {
+            const hubCx = p.x + PADDING + CARD_W / 2;
+            const hubBy = p.y + PADDING + CARD_H;
+            const pw    = union.coParent ? PAIR_W : CARD_W;
+            const px    = pairX + PADDING + pw / 2;
+            const py    = pairY + PADDING;
+            const mid   = (hubBy + py) / 2;
+            return (
+              <path d={`M ${hubCx} ${hubBy} C ${hubCx} ${mid}, ${px} ${mid}, ${px} ${py}`}
+                fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 3" />
+            );
+          })
+        )}
+
+      </svg>
+
+      {positions.map(p => {
+        const isRoot     = depths[p.person._id] === 0;
+        const isDeceased = !!p.person.dateDeces;
+
+        if (!p.unionPairs) {
+          const union      = p.unions[0] ?? null;
+          const coParent   = union?.coParent ?? null;
+          const isDivorced = union?.isDivorced ?? false;
+          const cpDeceased = !!coParent?.dateDeces;
+          return (
+            <div class="couple-node" style={`top:${p.y + PADDING}px;left:${p.x + PADDING}px;`}>
+              <a href={`/tree/${p.person._id}`}
+                class={['card', isRoot ? 'card--root' : '', isDeceased ? 'card--deceased' : ''].filter(Boolean).join(' ')}
+                style={`width:${CARD_W}px;height:${CARD_H}px;`}>
+                <span class="card__prenom">{p.person.prenom}</span>
+                <span class="card__nom">{p.person.nom.toUpperCase()}</span>
+                {isDeceased && p.person.dateDeces &&
+                  <span class="card__date">† {formatDateFR(p.person.dateDeces)}</span>}
+              </a>
+              {coParent && <>
+                <div class={`sep${isDivorced ? ' sep--divorced' : ''}`}>{isDivorced ? '✂' : '♥'}</div>
+                <a href={`/tree/${coParent._id}`}
+                  class={['card','card--conjoint', isDivorced ? 'card--divorced':'', isRoot ? 'card--root':'', cpDeceased ? 'card--deceased':''].filter(Boolean).join(' ')}
+                  style={`width:${CARD_W}px;height:${CARD_H}px;`}>
+                  <span class="card__prenom">{coParent.prenom}</span>
+                  <span class="card__nom">{coParent.nom.toUpperCase()}</span>
+                  {cpDeceased && coParent.dateDeces &&
+                    <span class="card__date">† {formatDateFR(coParent.dateDeces)}</span>}
+                </a>
+              </>}
+            </div>
+          );
+        }
+
+        // Multi-union
+        return (
+          <>
+            {/* Hub */}
+            <div class="couple-node" style={`top:${p.y + PADDING}px;left:${p.x + PADDING}px;`}>
+              <a href={`/tree/${p.person._id}`}
+                class={['card','card--hub', isRoot ? 'card--root':'', isDeceased ? 'card--deceased':''].filter(Boolean).join(' ')}
+                style={`width:${CARD_W}px;height:${CARD_H}px;`}>
+                <span class="card__prenom">{p.person.prenom}</span>
+                <span class="card__nom">{p.person.nom.toUpperCase()}</span>
+                {isDeceased && p.person.dateDeces &&
+                  <span class="card__date">† {formatDateFR(p.person.dateDeces)}</span>}
+              </a>
+            </div>
+
+            {/* Paires */}
+            {p.unionPairs!.map(({ union, pairX, pairY }) => {
+              const cp         = union.coParent;
+              const isDivorced = union.isDivorced;
+              const cpDeceased = !!cp?.dateDeces;
+              return (
+                <div class="couple-node" style={`top:${pairY + PADDING}px;left:${pairX + PADDING}px;`}>
+                  <a href={`/tree/${p.person._id}`}
+                    class={['card','card--self', isDeceased ? 'card--deceased':''].filter(Boolean).join(' ')}
+                    style={`width:${CARD_W}px;height:${CARD_H}px;`}>
+                    <span class="card__prenom">{p.person.prenom}</span>
+                    <span class="card__nom">{p.person.nom.toUpperCase()}</span>
+                  </a>
+                  {cp && <>
+                    <div class={`sep${isDivorced ? ' sep--divorced':''}`}>{isDivorced ? '✂' : '♥'}</div>
+                    <a href={`/tree/${cp._id}`}
+                      class={['card','card--conjoint', isDivorced ? 'card--divorced':'', cpDeceased ? 'card--deceased':''].filter(Boolean).join(' ')}
+                      style={`width:${CARD_W}px;height:${CARD_H}px;`}>
+                      <span class="card__prenom">{cp.prenom}</span>
+                      <span class="card__nom">{cp.nom.toUpperCase()}</span>
+                      {cpDeceased && cp.dateDeces &&
+                        <span class="card__date">† {formatDateFR(cp.dateDeces)}</span>}
+                    </a>
+                  </>}
+                </div>
+              );
+            })}
+          </>
+        );
+      })}
+
+    </div>
+  </div>
+</div>
+
+<style>
+  .tree-wrapper {
+    background: #fafaf9;
+    border: 1px solid #e7e5e4;
+    border-radius: 12px;
+    padding: 1rem;
+    overflow: hidden;
+  }
+  .tree-scroll  { overflow: auto; padding-top: 50px; }
+  .tree-canvas  { position: relative; }
+  .tree-svg     { position: absolute; top:0; left:0; pointer-events:none; overflow:visible; z-index:0; }
+
+  .couple-node  { position: absolute; display: flex; align-items: center; z-index: 1; }
+
+  /* ── Séparateur ── */
+  .sep           { font-size:.75rem; color:#f43f5e; padding:0 5px; flex-shrink:0; width:14px; text-align:center; }
+  .sep--divorced { color:#a8a29e; font-size:.9rem; }
+
+  /* ── Carte de base ── */
+  .card {
+    position: relative; box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0 .6rem; gap: 2px;
+    border: 1px solid #e7e5e4; border-radius: 10px; background: #fff;
+    box-shadow: 0 1px 3px rgba(28,25,23,.06);
+    text-decoration: none; flex-shrink: 0;
+    transition: border-color .15s, box-shadow .15s, transform .15s;
+  }
+  .card:hover {
+    border-color: #d97706;
+    box-shadow: 0 4px 12px rgba(180,83,9,.12);
+    transform: translateY(-1px);
+    z-index: 3;
+  }
+
+  /* ── Racine ── */
+  .card--root               { background: #78350f; border-color: #78350f; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  .card--root:hover         { border-color: #92400e; box-shadow: 0 4px 12px rgba(120,53,15,.3); }
+  .card--root .card__prenom { color: #d97706; }
+  .card--root .card__nom    { color: #fef3c7; }
+
+  /* ── Hub (multi-union) ── */
+  .card--hub       { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251,191,36,.25); }
+  .card--hub:hover { box-shadow: 0 4px 12px rgba(180,83,9,.2); }
+
+  /* ── Self dans multi-union ── */
+  .card--self               { background: #fafaf9; border-color: #d6d3d1; border-style: dashed; opacity: .75; }
+  .card--self:hover         { opacity:1; border-color: #d97706; }
+  .card--self .card__prenom { color: #a8a29e; }
+  .card--self .card__nom    { color: #57534e; }
+  .card--self:hover .card__nom { color: #1c1917; }
+
+  /* ── Conjoint ── */
+  .card--conjoint               { background: #fff7ed; border-color: #fed7aa; }
+  .card--conjoint:hover         { border-color: #d97706; }
+  .card--conjoint .card__prenom { color: #c2410c; }
+  .card--conjoint .card__nom    { color: #9a3412; }
+
+  /* ── Divorcé ── */
+  .card--divorced               { background: #fafaf9; border-color: #d6d3d1; border-style: dashed; }
+  .card--divorced:hover         { border-color: #a8a29e; }
+  .card--divorced .card__prenom { color: #a8a29e; }
+  .card--divorced .card__nom    { color: #78716c; }
+
+  /* ── Décédé ── */
+  .card--deceased               { background: #292524; border-color: #1c1917; }
+  .card--deceased:hover         { border-color: #44403c; }
+  .card--deceased .card__prenom { color: #78716c; }
+  .card--deceased .card__nom    { color: #e7e5e4; }
+  .card--deceased .card__date   { color: #57534e; }
+  .card--deceased::after        { content:'†'; position:absolute; top:3px; right:5px; font-size:.5rem; color:#57534e; }
+  .card--deceased:hover .card__nom { color: #fafaf9; }
+
+  /* ── Textes généraux ── */
+  .card__prenom { font-size:.7rem;  color:#78716c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
+  .card__nom    { font-size:.8rem;  font-weight:600; color:#1c1917; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
+  .card__date   { font-size:.58rem; color:#a8a29e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; line-height:1; }
+
+  .card:hover .card__nom        { color: #92400e; }
+  .card--root:hover .card__nom  { color: #fde68a; }
+
+  /* ── Bouton ancêtre ── */
+  .ancestor-btn {
+    position: absolute; font-size: .65rem; font-weight: 500;
+    color: #78716c; background: #fafaf9; border: 1px solid #d6d3d1;
+    border-radius: 9999px; padding: .15rem .6rem;
+    text-decoration: none; white-space: nowrap; z-index: 2;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .ancestor-btn:hover { background: #78350f; color: #fef3c7; border-color: #78350f; }
+</style>

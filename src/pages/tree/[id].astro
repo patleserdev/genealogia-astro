@@ -1,0 +1,255 @@
+---
+import Baselayout from "../../layouts/Baselayout.astro";
+import { ObjectId } from "mongodb";
+import { db, persons, relations } from "../../lib/mongo";
+import FamilyTreeVertical from "../../components/FamilyTreeVertical.astro";
+import FamilyTreeCompact from "../../components/FamilyTreeCompact.astro";
+import FamilyTreeGrid from "../../components/FamilyTreeGrid.astro";
+import { verifyToken } from "../../lib/auth.ts";
+export const prerender = false;
+
+const token = Astro.cookies.get('token')?.value
+if (!token) return Astro.redirect('/login')
+
+let user: any   = null
+
+try {
+  const payload = verifyToken(token)
+  user   = await db.collection('users').findOne({ _id: new ObjectId(payload.userId) })
+ 
+} catch {
+  return Astro.redirect('/login')
+}
+
+const { id } = Astro.params;
+const personId = new ObjectId(id);
+
+const allPersons   = await persons.find({}).toArray();
+const allRelations = await relations.find({}).toArray();
+
+const personMap = new Map(allPersons.map((p) => [p._id!.toString(), p]));
+
+const parentRelations   = allRelations.filter((r) => r.type === "PARENT");
+const conjointRelations = allRelations.filter((r) => r.type === "CONJOINT");
+
+const childrenMap = new Map<string, { childId: string; coupleRelationId: string | null }[]>();
+const parentMap   = new Map<string, string[]>();
+
+for (const rel of parentRelations) {
+  const from = rel.from.toString();
+  const to   = rel.to.toString();
+  const coupleRelationId = rel.coupleRelationId?.toString() ?? null;
+  if (!childrenMap.has(from)) childrenMap.set(from, []);
+  childrenMap.get(from)!.push({ childId: to, coupleRelationId });
+  if (!parentMap.has(to)) parentMap.set(to, []);
+  parentMap.get(to)!.push(from);
+}
+
+const coupleMap   = new Map<string, { personA: string; personB: string; status: string | null }>();
+const conjointMap = new Map<string, { conjointId: string; relationId: string; status: string | null }[]>();
+
+for (const rel of conjointRelations) {
+  const relId  = rel._id!.toString();
+  const from   = rel.from.toString();
+  const to     = rel.to.toString();
+  const status = rel.status ?? null;
+  coupleMap.set(relId, { personA: from, personB: to, status });
+  if (!conjointMap.has(from)) conjointMap.set(from, []);
+  conjointMap.get(from)!.push({ conjointId: to, relationId: relId, status });
+  if (!conjointMap.has(to)) conjointMap.set(to, []);
+  conjointMap.get(to)!.push({ conjointId: from, relationId: relId, status });
+}
+
+function serializePerson(p: any, unionStatus?: string | null) {
+  return {
+    _id: p._id!.toString(),
+    prenom: p.prenom,
+    nom: p.nom,
+    sexe: p.sexe ?? null,
+    dateNaissance: p.dateNaissance ?? null,
+    dateDeces: p.dateDeces ?? null,
+    unionStatus: unionStatus ?? null,
+  };
+}
+
+function buildTree(rootId: string, depthUp = 1, depthDown = 2) {
+  const visited = new Set<string>();
+
+  function buildNode(id: string, currentDepthUp: number, currentDepthDown: number): any {
+    if (!personMap.has(id) || visited.has(id)) return null;
+    visited.add(id);
+
+    const person         = serializePerson(personMap.get(id)!);
+    const conjointEntries = conjointMap.get(id) ?? [];
+    const conjointEntry  = conjointEntries.find(e => e.status === 'ACTIVE') ?? conjointEntries[0] ?? null;
+    const conjoint       = conjointEntry && personMap.has(conjointEntry.conjointId)
+      ? serializePerson(personMap.get(conjointEntry.conjointId)!, conjointEntry.status)
+      : null;
+
+    const parents: any[] = [];
+    if (currentDepthUp > 0 && parentMap.has(id)) {
+      for (const pid of parentMap.get(id)!) {
+        const parentNode = buildNode(pid, currentDepthUp - 1, 0);
+        if (parentNode) parents.push(parentNode);
+      }
+    }
+
+    const childrenByCouple = new Map<string, string[]>();
+    if (currentDepthDown > 0) {
+      if (childrenMap.has(id)) {
+        for (const { childId, coupleRelationId } of childrenMap.get(id)!) {
+          const key = coupleRelationId ?? "__none__";
+          if (!childrenByCouple.has(key)) childrenByCouple.set(key, []);
+          childrenByCouple.get(key)!.push(childId);
+        }
+      }
+      for (const entry of conjointEntries) {
+        const partnerId = entry.conjointId;
+        const relId     = entry.relationId;
+        if (childrenMap.has(partnerId)) {
+          for (const { childId, coupleRelationId } of childrenMap.get(partnerId)!) {
+            if (coupleRelationId === relId) {
+              const key = coupleRelationId;
+              if (!childrenByCouple.has(key)) childrenByCouple.set(key, []);
+              if (!childrenByCouple.get(key)!.includes(childId))
+                childrenByCouple.get(key)!.push(childId);
+            }
+          }
+        }
+      }
+    }
+
+    const childGroups: any[] = [];
+    for (const [coupleRelId, childIds] of childrenByCouple) {
+      let coParent = null;
+      if (coupleRelId !== "__none__" && coupleMap.has(coupleRelId)) {
+        const couple     = coupleMap.get(coupleRelId)!;
+        const coParentId = couple.personA === id ? couple.personB : couple.personA;
+        if (personMap.has(coParentId))
+          coParent = serializePerson(personMap.get(coParentId)!, couple.status);
+      }
+      const children: any[] = [];
+      for (const cid of childIds) {
+        const childNode = buildNode(cid, 0, currentDepthDown - 1);
+        if (childNode) children.push(childNode);
+      }
+      if (children.length > 0) childGroups.push({ coParent, children });
+    }
+
+    return { person, conjoint, parents, childGroups };
+  }
+
+  return buildNode(rootId, depthUp, depthDown);
+}
+
+const tree          = buildTree(personId.toString(), 1, 2);
+const rootParentIds = parentMap.get(personId.toString()) ?? [];
+const parentId      = rootParentIds[0] ?? null;
+
+const rootPerson = personMap.get(personId.toString());
+const rootName   = rootPerson ? `${rootPerson.prenom} ${rootPerson.nom}` : 'Arbre';
+---
+
+<Baselayout title={`Arbre — ${rootName}`}>
+  <div class="max-w-full px-6 py-6 space-y-5">
+
+    <!-- En-tête -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div class="flex items-center gap-3">
+        <a href={`/person/${id}`}
+          class="inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-800 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+          Retour
+        </a>
+        <div class="w-px h-4 bg-stone-200"></div>
+        <div>
+          <h1 class="text-lg font-semibold text-stone-800 tracking-tight">{rootName}</h1>
+          <p class="text-xs text-stone-500">Arbre généalogique</p>
+        </div>
+      </div>
+
+      <!-- Sélecteur de vue -->
+      <div class="flex items-center gap-1 bg-stone-100 rounded-xl p-1">
+        <button id="btn-tree"
+          class="view-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 7h6M3 12h6M3 17h6M13 7l4 5-4 5M17 12H21"/>
+          </svg>
+          Arbre
+        </button>
+        <button id="btn-compact"
+          class="view-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+          </svg>
+          Compact
+        </button>
+        <button id="btn-grid"
+          class="view-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+          </svg>
+          Grille
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Contenu des vues -->
+    <div id="view-tree">
+      <FamilyTreeVertical node={tree} parentId={parentId} />
+    </div>
+    <div id="view-compact" class="hidden">
+      <FamilyTreeCompact node={tree} />
+    </div>
+    <div id="view-grid" class="hidden">
+      <FamilyTreeGrid node={tree} />
+    </div>
+
+  </div>
+</Baselayout>
+
+<style>
+  .view-btn {
+    color: #78716c;
+  }
+  .view-btn:hover {
+    background: #e7e5e4;
+    color: #44403c;
+  }
+  .view-btn.active {
+    background: white;
+    color: #92400e;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+</style>
+
+<script>
+  type View = 'tree' | 'compact' | 'grid';
+  const views: View[] = ['tree', 'compact', 'grid'];
+
+  const els = Object.fromEntries(
+    views.map(v => [v, {
+      btn:  document.getElementById(`btn-${v}`)!,
+      view: document.getElementById(`view-${v}`)!,
+    }])
+  ) as Record<View, { btn: HTMLElement; view: HTMLElement }>;
+
+  function switchTo(v: View) {
+    views.forEach(k => {
+      els[k].btn.classList.toggle('active', k === v);
+      els[k].view.classList.toggle('hidden', k !== v);
+    });
+    sessionStorage.setItem('tree-view', v);
+  }
+
+  const saved = sessionStorage.getItem('tree-view') as View | null;
+  switchTo(saved && views.includes(saved) ? saved : 'tree');
+
+  views.forEach(v => els[v].btn.addEventListener('click', () => switchTo(v)));
+</script>

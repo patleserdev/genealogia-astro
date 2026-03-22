@@ -1,0 +1,215 @@
+---
+import { formatDateFR } from "../utils/formatDate.ts";
+
+const { node } = Astro.props;
+
+interface Person {
+  _id: string;
+  prenom: string;
+  nom: string;
+  dateNaissance?: string | null;
+  dateDeces?: string | null;
+  unionStatus?: string | null;
+}
+interface ChildGroup { coParent: Person | null; children: TreeNode[]; }
+interface TreeNode {
+  person: Person;
+  conjoint?: Person | null;
+  childGroups?: ChildGroup[];
+}
+interface GridPerson {
+  person: Person;
+  generation: number;
+  conjointNames: { name: string; isDivorced: boolean }[];
+  childNames: string[];
+  childCount: number;
+  isDeceased: boolean;
+}
+
+function flattenTree(n: TreeNode, gen = 0, seen = new Set<string>()): GridPerson[] {
+  if (seen.has(n.person._id)) return [];
+  seen.add(n.person._id);
+
+  const seenCp = new Set<string>();
+  const conjointNames: { name: string; isDivorced: boolean }[] = [];
+  const allCoParents: Person[] = [];
+
+  for (const g of (n.childGroups ?? [])) {
+    if (g.coParent && !seenCp.has(g.coParent._id)) {
+      seenCp.add(g.coParent._id);
+      allCoParents.push(g.coParent);
+      conjointNames.push({ name: `${g.coParent.prenom} ${g.coParent.nom}`, isDivorced: g.coParent.unionStatus === 'DIVORCED' });
+    }
+  }
+  if (n.conjoint && !seenCp.has(n.conjoint._id)) {
+    seenCp.add(n.conjoint._id);
+    allCoParents.push(n.conjoint);
+    conjointNames.push({ name: `${n.conjoint.prenom} ${n.conjoint.nom}`, isDivorced: n.conjoint.unionStatus === 'DIVORCED' });
+  }
+
+  const allChildren = (n.childGroups ?? []).flatMap(g => g.children);
+  const result: GridPerson[] = [{
+    person: n.person,
+    generation: gen,
+    conjointNames,
+    childNames: allChildren.map(c => c.person.prenom),
+    childCount: allChildren.length,
+    isDeceased: !!n.person.dateDeces,
+  }];
+
+  for (const cp of allCoParents) {
+    if (seen.has(cp._id)) continue;
+    seen.add(cp._id);
+    const sharedChildren = (n.childGroups ?? []).filter(g => g.coParent?._id === cp._id).flatMap(g => g.children);
+    result.push({
+      person: cp,
+      generation: gen,
+      conjointNames: [{ name: `${n.person.prenom} ${n.person.nom}`, isDivorced: cp.unionStatus === 'DIVORCED' }],
+      childNames: sharedChildren.map(c => c.person.prenom),
+      childCount: sharedChildren.length,
+      isDeceased: !!cp.dateDeces,
+    });
+  }
+
+  for (const g of (n.childGroups ?? [])) {
+    for (const c of g.children) result.push(...flattenTree(c, gen + 1, seen));
+  }
+  return result;
+}
+
+const allPersons = flattenTree(node);
+const genMap = new Map<number, GridPerson[]>();
+for (const p of allPersons) {
+  if (!genMap.has(p.generation)) genMap.set(p.generation, []);
+  genMap.get(p.generation)!.push(p);
+}
+const generations = [...genMap.entries()].sort((a, b) => a[0] - b[0]);
+const genLabels = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+
+function initials(prenom: string, nom: string) {
+  return `${prenom.charAt(0)}${nom.charAt(0)}`.toUpperCase();
+}
+function avatarColor(prenom: string): string {
+  const colors = [
+    { bg: '#fef3c7', border: '#fde68a', text: '#92400e' },
+    { bg: '#dbeafe', border: '#bfdbfe', text: '#1e40af' },
+    { bg: '#d1fae5', border: '#a7f3d0', text: '#065f46' },
+    { bg: '#fce7f3', border: '#fbcfe8', text: '#9d174d' },
+    { bg: '#ede9fe', border: '#ddd6fe', text: '#5b21b6' },
+    { bg: '#ffedd5', border: '#fed7aa', text: '#9a3412' },
+    { bg: '#e0f2fe', border: '#bae6fd', text: '#0c4a6e' },
+    { bg: '#f0fdf4', border: '#bbf7d0', text: '#14532d' },
+  ];
+  let h = 0;
+  for (let i = 0; i < prenom.length; i++) h = (h * 37 + prenom.charCodeAt(i)) % colors.length;
+  return JSON.stringify(colors[h]);
+}
+---
+
+<div class="space-y-2">
+  {generations.map(([genIdx, persons]) => (
+    <section>
+      <!-- Label génération -->
+      <div class="flex items-center gap-3 mb-3 px-1">
+        <div class="flex items-center gap-2">
+          <span class="w-7 h-7 rounded-lg bg-amber-800 flex items-center justify-center text-xs font-semibold text-amber-100 shrink-0">
+            {genLabels[genIdx] ?? `G${genIdx + 1}`}
+          </span>
+          <span class="text-xs font-medium text-stone-500 uppercase tracking-wider">
+            Génération {genIdx + 1}
+          </span>
+        </div>
+        <div class="flex-1 h-px bg-stone-200"></div>
+        <span class="text-xs text-stone-400">{persons.length} personne{persons.length > 1 ? 's' : ''}</span>
+      </div>
+
+      <!-- Grille -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 mb-6">
+        {persons.map(({ person, conjointNames, childNames, childCount, isDeceased }) => {
+          const colors = JSON.parse(avatarColor(person.prenom));
+          return (
+            <a
+              href={`/tree/${person._id}`}
+              class={`group flex flex-col bg-white border rounded-xl p-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 no-underline ${
+                isDeceased
+                  ? 'border-stone-200 bg-stone-50 opacity-75 hover:opacity-100'
+                  : 'border-stone-200 hover:border-amber-300'
+              }`}
+            >
+              <!-- Avatar -->
+              <div class="flex items-start justify-between mb-3">
+                <div
+                  class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 border-2"
+                  style={`background:${colors.bg}; border-color:${colors.border}; color:${colors.text}`}
+                >
+                  {isDeceased
+                    ? <span class="text-stone-400 text-base">†</span>
+                    : initials(person.prenom, person.nom)
+                  }
+                </div>
+                {isDeceased && (
+                  <span class="text-xs text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">†</span>
+                )}
+                {childCount > 0 && !isDeceased && (
+                  <span class="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                    {childCount}
+                  </span>
+                )}
+              </div>
+
+              <!-- Nom -->
+              <div class="mb-2 min-w-0">
+                <p class="text-xs text-stone-400 truncate leading-tight">{person.prenom}</p>
+                <p class={`text-sm font-semibold truncate leading-tight ${isDeceased ? 'text-stone-500' : 'text-stone-800'}`}>
+                  {person.nom.toUpperCase()}
+                </p>
+              </div>
+
+              <!-- Dates -->
+              {(person.dateNaissance || person.dateDeces) && (
+                <div class="space-y-0.5 mb-2">
+                  {person.dateNaissance && (
+                    <p class="text-xs text-stone-400 flex items-center gap-1 truncate">
+                      <span class="text-stone-300">°</span>
+                      {formatDateFR(person.dateNaissance)}
+                    </p>
+                  )}
+                  {person.dateDeces && (
+                    <p class="text-xs text-stone-400 flex items-center gap-1 truncate">
+                      <span class="text-stone-300">†</span>
+                      {formatDateFR(person.dateDeces)}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <!-- Conjoints -->
+              {conjointNames.length > 0 && (
+                <div class="mt-auto pt-2 border-t border-stone-100 space-y-1">
+                  {conjointNames.map(c => (
+                    <p class={`text-xs flex items-center gap-1 truncate ${c.isDivorced ? 'text-stone-400 line-through' : 'text-pink-600'}`}>
+                      <span class="shrink-0">{c.isDivorced ? '✂' : '♥'}</span>
+                      <span class="truncate">{c.name}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <!-- Enfants -->
+              {childCount > 0 && (
+                <div class={`pt-2 ${conjointNames.length > 0 ? '' : 'mt-auto border-t border-stone-100'}`}>
+                  <p class="text-xs text-stone-400 truncate italic">{childNames.join(', ')}</p>
+                </div>
+              )}
+
+              <!-- Lien hover -->
+              <div class="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span class="text-xs text-amber-700 font-medium">Voir l'arbre →</span>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  ))}
+</div>

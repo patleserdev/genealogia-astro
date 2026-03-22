@@ -2,7 +2,7 @@
   "name": "genealogie-app",
   "type": "module",
   "version": "0.0.1",
-  "license":"none",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -12,10 +12,16 @@
   "dependencies": {
     "@astrojs/node": "^9.5.3",
     "@astrojs/vercel": "^9.0.4",
+    "@auth/mongodb-adapter": "^3.11.1",
     "@tailwindcss/vite": "^4.1.18",
     "astro": "^5.17.3",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
+    "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.1.0",
     "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10"
   }
 }
