@@ -160,10 +160,10 @@ const nav = [
             class="block px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100 transition-colors font-medium">
             Se connecter
           </a>
-          <a href="/register"
-            class="block px-3 py-2 rounded-lg text-sm text-amber-700 hover:bg-amber-50 transition-colors font-medium">
-            S'inscrire
-          </a>
+          {!registrationEnabled && <a href="/register"
+                class="px-3 py-1.5 rounded-lg text-sm bg-amber-600 hover:bg-amber-700 text-white transition-colors font-medium">
+                S'inscrire
+              </a>}
         </>
       )}
     </div>
