@@ -1,5 +1,8 @@
 ---
 import Baselayout from "../layouts/Baselayout.astro";
+const registrationEnabled = import.meta.env.PUBLIC_REGISTRATION_ENABLED !== 'false'
+
+if (!registrationEnabled) return Astro.redirect('/login')
 ---
 <Baselayout title="S'inscrire">
   <div class="h-full bg-stone-50 flex overflow-hidden">
