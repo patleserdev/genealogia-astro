@@ -8,6 +8,7 @@ let currentUser = null
 if (token) {
   try { currentUser = verifyToken(token) } catch {}
 }
+const registrationEnabled = import.meta.env.PUBLIC_REGISTRATION_ENABLED !== 'false'
 
 const data = await persons.find({ active: true }).toArray();
 const today = new Date();
@@ -78,13 +79,13 @@ const totalPersons = data.length;
           ) : (
             <>
               <a href="/login"
-                class="px-4 py-2 text-white/80 hover:text-white text-sm transition-colors">
+                class="px-4 py-2 bg-white text-amber-800 hover:bg-amber-50 text-sm font-medium rounded-lg transition-colors">
                 Se connecter
               </a>
-              <a href="/register"
-                class="px-4 py-2 bg-white text-amber-800 hover:bg-amber-50 text-sm font-medium rounded-lg transition-colors">
+             { !registrationEnabled && <a href="/register"
+                class="px-4 py-2 bg-transparent hover:bg-white hover:text-amber-700 border border-white text-white hover:border-amber-50 text-sm font-medium rounded-lg transition-colors">
                 S'inscrire
-              </a>
+              </a>}
             </>
           )}
         </div>
