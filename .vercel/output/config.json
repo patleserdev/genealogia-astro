@@ -1,0 +1,129 @@
+{
+	"version": 3,
+	"routes": [
+		{
+			"handle": "filesystem"
+		},
+		{
+			"src": "^/_astro/(.*)$",
+			"headers": {
+				"cache-control": "public, max-age=31536000, immutable"
+			},
+			"continue": true
+		},
+		{
+			"src": "^/_server-islands/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/_image/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/auth/login/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/auth/logout/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/auth/register/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/me/update/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/me/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/persons/search/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/persons/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/persons/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/relations/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/relations/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/tree/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/login/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/persons/add-with-relations/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/persons/new/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/persons/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/persons/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/profil/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/register/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/relations/add/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/relations/add-quick/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/relations/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/tree/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/$",
+			"dest": "_render"
+		}
+	],
+	"images": {
+		"sizes": [
+			640,
+			750,
+			828,
+			1080,
+			1200,
+			1920,
+			2048,
+			3840
+		],
+		"domains": [],
+		"remotePatterns": []
+	}
+}
