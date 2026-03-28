@@ -1,4 +1,4 @@
-import { ao as NOOP_MIDDLEWARE_HEADER, ap as REDIRECT_STATUS_CODES, A as AstroError, aq as ActionsReturnedInvalidDataError, X as DEFAULT_404_COMPONENT } from './astro/server_Cr2bBY3R.mjs';
+import { aq as NOOP_MIDDLEWARE_HEADER, ar as REDIRECT_STATUS_CODES, A as AstroError, as as ActionsReturnedInvalidDataError, Z as DEFAULT_404_COMPONENT } from './astro/server_DzJdx5CC.mjs';
 import { parse, stringify } from 'devalue';
 import { escape } from 'html-escaper';
 
@@ -126,7 +126,7 @@ function getActionQueryString(name) {
 }
 function serializeActionResult(res) {
   if (res.error) {
-    if (Object.assign(__vite_import_meta_env__, {})?.DEV) {
+    if (Object.assign(__vite_import_meta_env__, { _: process.env._ })?.DEV) {
       actionResultErrorStack.set(res.error.stack);
     }
     let body2;
@@ -193,7 +193,7 @@ function deserializeActionResult(res) {
         })
       };
     }
-    if (Object.assign(__vite_import_meta_env__, {})?.PROD) {
+    if (Object.assign(__vite_import_meta_env__, { _: process.env._ })?.PROD) {
       return { error: ActionError.fromJson(json), data: void 0 };
     } else {
       const error = ActionError.fromJson(json);

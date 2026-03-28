@@ -88,9 +88,9 @@ const coupleRelationsData = coupleRelations.map((r) => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
             </svg>
             <input id="searchA" type="text" placeholder="Rechercher par nom…" autocomplete="off"
-              class="w-full pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+              class="w-full pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition "/>
           </div>
-          <ul id="resultsA" class="hidden mt-1 border border-stone-200 rounded-xl bg-white shadow-md overflow-hidden max-h-48 overflow-y-auto divide-y divide-stone-100"></ul>
+          <ul id="resultsA" class="hidden mt-1 border border-stone-200 rounded-xl bg-white shadow-md overflow-hidden max-h-48 overflow-y-auto divide-y divide-stone-100 capitalize"></ul>
           <input type="hidden" id="personA" />
           <p id="selectedA" class="hidden mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></p>
         </div>
@@ -147,7 +147,7 @@ const coupleRelationsData = coupleRelations.map((r) => {
             <input id="searchB" type="text" placeholder="Rechercher par nom…" autocomplete="off"
               class="w-full pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
           </div>
-          <ul id="resultsB" class="hidden mt-1 border border-stone-200 rounded-xl bg-white shadow-md overflow-hidden max-h-48 overflow-y-auto divide-y divide-stone-100"></ul>
+          <ul id="resultsB" class="hidden mt-1 border border-stone-200 rounded-xl bg-white shadow-md overflow-hidden max-h-48 overflow-y-auto divide-y divide-stone-100 capitalize"></ul>
           <input type="hidden" id="personB" />
           <p id="selectedB" class="hidden mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></p>
         </div>

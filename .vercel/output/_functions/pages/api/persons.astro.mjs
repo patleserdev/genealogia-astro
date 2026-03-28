@@ -1,4 +1,4 @@
-import { p as persons } from '../../chunks/mongo_pJhMhjwv.mjs';
+import { persons } from '../../chunks/mongo_DDLBCJZd.mjs';
 export { renderers } from '../../renderers.mjs';
 
 const prerender = false;

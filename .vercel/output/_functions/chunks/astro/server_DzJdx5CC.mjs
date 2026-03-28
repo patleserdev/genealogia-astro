@@ -3,7 +3,7 @@ import { clsx } from 'clsx';
 import { escape } from 'html-escaper';
 import { decodeBase64, encodeBase64, encodeHexUpperCase, decodeHex } from '@oslojs/encoding';
 import { z } from 'zod';
-import 'cssesc';
+import cssesc from 'cssesc';
 
 const ASTRO_VERSION = "5.17.3";
 const REROUTE_DIRECTIVE_HEADER = "X-Astro-Reroute";
@@ -2817,8 +2817,236 @@ async function renderScript(result, id) {
   return createRenderInstruction({ type: "script", id, content });
 }
 
-"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_".split("").reduce((v, c) => (v[c.charCodeAt(0)] = c, v), []);
-"-0123456789_".split("").reduce((v, c) => (v[c.charCodeAt(0)] = c, v), []);
+const EASE_IN_OUT_QUART = "cubic-bezier(0.76, 0, 0.24, 1)";
+function slide({
+  duration
+} = {}) {
+  return {
+    forwards: {
+      old: [
+        {
+          name: "astroFadeOut",
+          duration: duration ?? "90ms",
+          easing: EASE_IN_OUT_QUART,
+          fillMode: "both"
+        },
+        {
+          name: "astroSlideToLeft",
+          duration: duration ?? "220ms",
+          easing: EASE_IN_OUT_QUART,
+          fillMode: "both"
+        }
+      ],
+      new: [
+        {
+          name: "astroFadeIn",
+          duration: duration ?? "210ms",
+          easing: EASE_IN_OUT_QUART,
+          delay: duration ? void 0 : "30ms",
+          fillMode: "both"
+        },
+        {
+          name: "astroSlideFromRight",
+          duration: duration ?? "220ms",
+          easing: EASE_IN_OUT_QUART,
+          fillMode: "both"
+        }
+      ]
+    },
+    backwards: {
+      old: [{ name: "astroFadeOut" }, { name: "astroSlideToRight" }],
+      new: [{ name: "astroFadeIn" }, { name: "astroSlideFromLeft" }]
+    }
+  };
+}
+function fade({
+  duration
+} = {}) {
+  const anim = {
+    old: {
+      name: "astroFadeOut",
+      duration: duration ?? 180,
+      easing: EASE_IN_OUT_QUART,
+      fillMode: "both"
+    },
+    new: {
+      name: "astroFadeIn",
+      duration: duration ?? 180,
+      easing: EASE_IN_OUT_QUART,
+      fillMode: "both"
+    }
+  };
+  return {
+    forwards: anim,
+    backwards: anim
+  };
+}
+
+const transitionNameMap = /* @__PURE__ */ new WeakMap();
+function incrementTransitionNumber(result) {
+  let num = 1;
+  if (transitionNameMap.has(result)) {
+    num = transitionNameMap.get(result) + 1;
+  }
+  transitionNameMap.set(result, num);
+  return num;
+}
+function createTransitionScope(result, hash) {
+  const num = incrementTransitionNumber(result);
+  return `astro-${hash}-${num}`;
+}
+const getAnimations = (name) => {
+  if (name === "fade") return fade();
+  if (name === "slide") return slide();
+  if (typeof name === "object") return name;
+};
+const addPairs = (animations, stylesheet) => {
+  for (const [direction, images] of Object.entries(animations)) {
+    for (const [image, rules] of Object.entries(images)) {
+      stylesheet.addAnimationPair(direction, image, rules);
+    }
+  }
+};
+const reEncodeValidChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_".split("").reduce((v, c) => (v[c.charCodeAt(0)] = c, v), []);
+const reEncodeInValidStart = "-0123456789_".split("").reduce((v, c) => (v[c.charCodeAt(0)] = c, v), []);
+function reEncode(s) {
+  let result = "";
+  let codepoint;
+  for (let i = 0; i < s.length; i += (codepoint ?? 0) > 65535 ? 2 : 1) {
+    codepoint = s.codePointAt(i);
+    if (codepoint !== void 0) {
+      result += codepoint < 128 ? codepoint === 95 ? "__" : reEncodeValidChars[codepoint] ?? "_" + codepoint.toString(16).padStart(2, "0") : String.fromCodePoint(codepoint);
+    }
+  }
+  return reEncodeInValidStart[result.codePointAt(0) ?? 0] ? "_" + result : result;
+}
+function renderTransition(result, hash, animationName, transitionName) {
+  if (typeof (transitionName ?? "") !== "string") {
+    throw new Error(`Invalid transition name {${transitionName}}`);
+  }
+  if (!animationName) animationName = "fade";
+  const scope = createTransitionScope(result, hash);
+  const name = transitionName ? cssesc(reEncode(transitionName), { isIdentifier: true }) : scope;
+  const sheet = new ViewTransitionStyleSheet(scope, name);
+  const animations = getAnimations(animationName);
+  if (animations) {
+    addPairs(animations, sheet);
+  } else if (animationName === "none") {
+    sheet.addFallback("old", "animation: none; mix-blend-mode: normal;");
+    sheet.addModern("old", "animation: none; opacity: 0; mix-blend-mode: normal;");
+    sheet.addAnimationRaw("new", "animation: none; mix-blend-mode: normal;");
+    sheet.addModern("group", "animation: none");
+  }
+  const css = sheet.toString();
+  result._metadata.extraHead.push(markHTMLString(`<style>${css}</style>`));
+  return scope;
+}
+class ViewTransitionStyleSheet {
+  constructor(scope, name) {
+    this.scope = scope;
+    this.name = name;
+  }
+  modern = [];
+  fallback = [];
+  toString() {
+    const { scope, name } = this;
+    const [modern, fallback] = [this.modern, this.fallback].map((rules) => rules.join(""));
+    return [
+      `[data-astro-transition-scope="${scope}"] { view-transition-name: ${name}; }`,
+      this.layer(modern),
+      fallback
+    ].join("");
+  }
+  layer(cssText) {
+    return cssText ? `@layer astro { ${cssText} }` : "";
+  }
+  addRule(target, cssText) {
+    this[target].push(cssText);
+  }
+  addAnimationRaw(image, animation) {
+    this.addModern(image, animation);
+    this.addFallback(image, animation);
+  }
+  addModern(image, animation) {
+    const { name } = this;
+    this.addRule("modern", `::view-transition-${image}(${name}) { ${animation} }`);
+  }
+  addFallback(image, animation) {
+    const { scope } = this;
+    this.addRule(
+      "fallback",
+      // Two selectors here, the second in case there is an animation on the root.
+      `[data-astro-transition-fallback="${image}"] [data-astro-transition-scope="${scope}"],
+			[data-astro-transition-fallback="${image}"][data-astro-transition-scope="${scope}"] { ${animation} }`
+    );
+  }
+  addAnimationPair(direction, image, rules) {
+    const { scope, name } = this;
+    const animation = stringifyAnimation(rules);
+    const prefix = direction === "backwards" ? `[data-astro-transition=back]` : direction === "forwards" ? "" : `[data-astro-transition=${direction}]`;
+    this.addRule("modern", `${prefix}::view-transition-${image}(${name}) { ${animation} }`);
+    this.addRule(
+      "fallback",
+      `${prefix}[data-astro-transition-fallback="${image}"] [data-astro-transition-scope="${scope}"],
+			${prefix}[data-astro-transition-fallback="${image}"][data-astro-transition-scope="${scope}"] { ${animation} }`
+    );
+  }
+}
+function addAnimationProperty(builder, prop, value) {
+  let arr = builder[prop];
+  if (Array.isArray(arr)) {
+    arr.push(value.toString());
+  } else {
+    builder[prop] = [value.toString()];
+  }
+}
+function animationBuilder() {
+  return {
+    toString() {
+      let out = "";
+      for (let k in this) {
+        let value = this[k];
+        if (Array.isArray(value)) {
+          out += `
+	${k}: ${value.join(", ")};`;
+        }
+      }
+      return out;
+    }
+  };
+}
+function stringifyAnimation(anim) {
+  if (Array.isArray(anim)) {
+    return stringifyAnimations(anim);
+  } else {
+    return stringifyAnimations([anim]);
+  }
+}
+function stringifyAnimations(anims) {
+  const builder = animationBuilder();
+  for (const anim of anims) {
+    if (anim.duration) {
+      addAnimationProperty(builder, "animation-duration", toTimeValue(anim.duration));
+    }
+    if (anim.easing) {
+      addAnimationProperty(builder, "animation-timing-function", anim.easing);
+    }
+    if (anim.direction) {
+      addAnimationProperty(builder, "animation-direction", anim.direction);
+    }
+    if (anim.delay) {
+      addAnimationProperty(builder, "animation-delay", anim.delay);
+    }
+    if (anim.fillMode) {
+      addAnimationProperty(builder, "animation-fill-mode", anim.fillMode);
+    }
+    addAnimationProperty(builder, "animation-name", anim.name);
+  }
+  return builder.toString();
+}
+function toTimeValue(num) {
+  return typeof num === "number" ? num + "ms" : num;
+}
 
 function spreadAttributes(values = {}, _name, { class: scopedClassName } = {}) {
   let output = "";
@@ -2837,4 +3065,4 @@ function spreadAttributes(values = {}, _name, { class: scopedClassName } = {}) {
   return markHTMLString(output);
 }
 
-export { renderSlotToString as $, AstroError as A, REROUTE_DIRECTIVE_HEADER as B, i18nNoLocaleFoundInPath as C, ResponseSentError as D, ExpectedImage as E, FailedToFetchRemoteImageDimensions as F, ActionNotFoundError as G, MiddlewareNoDataOrNextCalled as H, IncompatibleDescriptorOptions as I, MiddlewareNotAResponse as J, originPathnameSymbol as K, LocalImageUsedWrongly as L, MissingImageDimension as M, NoImageMetadata as N, RewriteWithBodyUsed as O, GetStaticPathsRequired as P, InvalidGetStaticPathsReturn as Q, RemoteImageNotAllowed as R, InvalidGetStaticPathsEntry as S, GetStaticPathsExpectedParams as T, UnsupportedImageFormat as U, GetStaticPathsInvalidRouteParam as V, PageNumberParamNotFound as W, DEFAULT_404_COMPONENT as X, NoMatchingStaticPathFound as Y, PrerenderDynamicEndpointPathCollide as Z, ReservedSlotName as _, UnsupportedImageConversion as a, renderJSX as a0, chunkToString as a1, isRenderInstruction as a2, ForbiddenRewrite as a3, SessionStorageInitError as a4, SessionStorageSaveError as a5, ASTRO_VERSION as a6, CspNotEnabled as a7, LocalsReassigned as a8, generateCspDigest as a9, PrerenderClientAddressNotAvailable as aa, clientAddressSymbol as ab, ClientAddressNotAvailable as ac, StaticClientAddressNotAvailable as ad, AstroResponseHeadersReassigned as ae, responseSentSymbol as af, renderPage as ag, REWRITE_DIRECTIVE_HEADER_KEY as ah, REWRITE_DIRECTIVE_HEADER_VALUE as ai, renderEndpoint as aj, LocalsNotAnObject as ak, FailedToFindPageMapSSR as al, REROUTABLE_STATUS_CODES as am, nodeRequestAbortControllerCleanupSymbol as an, NOOP_MIDDLEWARE_HEADER as ao, REDIRECT_STATUS_CODES as ap, ActionsReturnedInvalidDataError as aq, ExpectedImageOptions as b, ExpectedNotESMImage as c, InvalidImageService as d, createComponent as e, ImageMissingAlt as f, addAttribute as g, createAstro as h, ExperimentalFontsNotEnabled as i, FontFamilyNotFound as j, renderComponent as k, renderScript as l, maybeRenderHead as m, defineScriptVars as n, Fragment as o, renderSlot as p, renderHead as q, renderTemplate as r, spreadAttributes as s, toStyleString as t, unescapeHTML as u, decodeKey as v, decryptString as w, createSlotValueFromString as x, isAstroComponentFactory as y, ROUTE_TYPE_HEADER as z };
+export { PrerenderDynamicEndpointPathCollide as $, AstroError as A, isAstroComponentFactory as B, ROUTE_TYPE_HEADER as C, REROUTE_DIRECTIVE_HEADER as D, ExpectedImage as E, FailedToFetchRemoteImageDimensions as F, i18nNoLocaleFoundInPath as G, ResponseSentError as H, IncompatibleDescriptorOptions as I, ActionNotFoundError as J, MiddlewareNoDataOrNextCalled as K, LocalImageUsedWrongly as L, MissingImageDimension as M, NoImageMetadata as N, MiddlewareNotAResponse as O, originPathnameSymbol as P, RewriteWithBodyUsed as Q, RemoteImageNotAllowed as R, GetStaticPathsRequired as S, InvalidGetStaticPathsReturn as T, UnsupportedImageFormat as U, InvalidGetStaticPathsEntry as V, GetStaticPathsExpectedParams as W, GetStaticPathsInvalidRouteParam as X, PageNumberParamNotFound as Y, DEFAULT_404_COMPONENT as Z, NoMatchingStaticPathFound as _, UnsupportedImageConversion as a, ReservedSlotName as a0, renderSlotToString as a1, renderJSX as a2, chunkToString as a3, isRenderInstruction as a4, ForbiddenRewrite as a5, SessionStorageInitError as a6, SessionStorageSaveError as a7, ASTRO_VERSION as a8, CspNotEnabled as a9, LocalsReassigned as aa, generateCspDigest as ab, PrerenderClientAddressNotAvailable as ac, clientAddressSymbol as ad, ClientAddressNotAvailable as ae, StaticClientAddressNotAvailable as af, AstroResponseHeadersReassigned as ag, responseSentSymbol as ah, renderPage as ai, REWRITE_DIRECTIVE_HEADER_KEY as aj, REWRITE_DIRECTIVE_HEADER_VALUE as ak, renderEndpoint as al, LocalsNotAnObject as am, FailedToFindPageMapSSR as an, REROUTABLE_STATUS_CODES as ao, nodeRequestAbortControllerCleanupSymbol as ap, NOOP_MIDDLEWARE_HEADER as aq, REDIRECT_STATUS_CODES as ar, ActionsReturnedInvalidDataError as as, ExpectedImageOptions as b, ExpectedNotESMImage as c, InvalidImageService as d, createComponent as e, ImageMissingAlt as f, addAttribute as g, createAstro as h, ExperimentalFontsNotEnabled as i, FontFamilyNotFound as j, renderComponent as k, renderScript as l, maybeRenderHead as m, defineScriptVars as n, Fragment as o, renderSlot as p, renderTransition as q, renderTemplate as r, spreadAttributes as s, toStyleString as t, unescapeHTML as u, createTransitionScope as v, renderHead as w, decodeKey as x, decryptString as y, createSlotValueFromString as z };

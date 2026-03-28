@@ -1,6 +1,6 @@
-import { e as createComponent, k as renderComponent, l as renderScript, r as renderTemplate, h as createAstro, m as maybeRenderHead } from '../chunks/astro/server_Cr2bBY3R.mjs';
+import { e as createComponent, k as renderComponent, l as renderScript, r as renderTemplate, h as createAstro, m as maybeRenderHead } from '../chunks/astro/server_DzJdx5CC.mjs';
 import 'piccolore';
-import { $ as $$Baselayout } from '../chunks/Baselayout_BtxBugC6.mjs';
+import { $ as $$Baselayout } from '../chunks/Baselayout_DbP0pFxM.mjs';
 import { v as verifyToken } from '../chunks/auth_C0Ch4QAz.mjs';
 export { renderers } from '../renderers.mjs';
 

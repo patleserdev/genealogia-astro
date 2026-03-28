@@ -6,30 +6,59 @@ import { verifyToken } from "../lib/auth.ts";
 import { db, persons } from "../lib/mongo";
 import { formatDateFR } from "../utils/formatDate";
 
-
 const token = Astro.cookies.get('token')?.value
 if (!token) return Astro.redirect('/login')
 
-let user: any   = null
-
 try {
   const payload = verifyToken(token)
-  user   = await db.collection('users').findOne({ _id: new ObjectId(payload.userId) })
- 
+  await db.collection('users').findOne({ _id: new ObjectId(payload.userId) })
 } catch {
   return Astro.redirect('/login')
 }
 
+function calcAge(from: Date, to: Date) {
+  let years  = to.getFullYear() - from.getFullYear();
+  let months = to.getMonth() - from.getMonth();
+  if (to.getDate() < from.getDate()) months--;
+  if (months < 0) { years--; months += 12; }
+  return { years, months };
+}
 
+function ageLabel({ years, months }: { years: number; months: number }) {
+  return years < 1 ? `${months} mois` : `${years} ans`;
+}
+
+function getGeneration(year: number): { label: string; color: string } | null {
+  if (year < 1928) return { label: "Génération de la guerre", color: "bg-stone-100 text-stone-500" };
+  if (year < 1946) return { label: "Silent Generation", color: "bg-stone-100 text-stone-500" };
+  if (year < 1965) return { label: "Baby-boomers",      color: "bg-orange-50 text-orange-600" };
+  if (year < 1981) return { label: "Génération X",      color: "bg-blue-50 text-blue-600"    };
+  if (year < 1997) return { label: "Millenials",        color: "bg-violet-50 text-violet-600" };
+  if (year < 2013) return { label: "Génération Z",      color: "bg-emerald-50 text-emerald-600" };
+  if (year < 2026) return { label: "Génération Alpha",      color: "bg-emerald-50 text-emerald-600" };
+  return           { label: "Génération Beta",         color: "bg-pink-50 text-pink-700"    };
+}
+
+const now  = new Date();
 const data = await persons.find({ active: true }).toArray();
+
 const personsList = data
-  .map((p) => ({
-    _id: p._id!.toString(),
-    prenom: p.prenom,
-    nom: p.nom,
-    dateNaissance: p.dateNaissance,
-    email: p.email,
-  }))
+  .map((p) => {
+    const dob = p.dateNaissance ? new Date(p.dateNaissance) : null;
+    const dod = p.dateDeces     ? new Date(p.dateDeces)     : null;
+    return {
+      _id:          p._id!.toString(),
+      prenom:       p.prenom,
+      nom:          p.nom,
+      email:        p.email ?? null,
+      dateNaissance: p.dateNaissance ?? null,
+      dateDeces:    p.dateDeces ?? null,
+      generation:   dob ? getGeneration(dob.getFullYear()) : null,
+      ageDeces:     dob && dod ? ageLabel(calcAge(dob, dod))  : null,
+      ageAujourdhui: dob       ? ageLabel(calcAge(dob, now))  : null,
+      anneesDeces:  dod ? dod.getFullYear() : null,
+    };
+  })
   .sort((a, b) => {
     if (!a.dateNaissance) return 1;
     if (!b.dateNaissance) return -1;
@@ -44,9 +73,9 @@ const personsList = data
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">Personnes</h1>
-        <p class="text-sm text-stone-500 mt-0.5">{personsList.length} personne{personsList.length > 1 ? 's' : ''} dans l'arbre</p>
+        <p class="text-sm text-stone-500 mt-0.5">{personsList.length} personne{personsList.length > 1 ? 's' : ''} dans la liste</p>
       </div>
-      <a href="/persons/new"
+      <a href="/persons/add-with-relations"
         class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -86,25 +115,43 @@ const personsList = data
         >
           <!-- Infos -->
           <div class="flex items-center gap-4 min-w-0">
-            <div class="w-9 h-9 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
-              <span class="text-sm font-medium text-amber-700">
-                {p.prenom.charAt(0).toUpperCase()}{p.nom.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-stone-800 capitalize truncate">
-                {p.prenom} {p.nom}
-              </p>
-              <div class="flex items-center gap-3 mt-0.5">
-                {p.dateNaissance && (
-                  <span class="text-xs text-stone-400">Né(e) le {formatDateFR(p.dateNaissance)}</span>
-                )}
-                {p.email && (
-                  <span class="text-xs text-stone-400 truncate">{p.email}</span>
-                )}
-              </div>
-            </div>
-          </div>
+
+<!-- Avatar -->
+<div class={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border ${
+  p.dateDeces ? 'bg-stone-100 border-stone-200' : 'bg-amber-50 border-amber-100'
+}`}>
+  <span class={`text-sm font-medium ${p.dateDeces ? 'text-stone-400' : 'text-amber-700'}`}>
+    {p.prenom.charAt(0).toUpperCase()}{p.nom.charAt(0).toUpperCase()}
+  </span>
+</div>
+
+<!-- Texte -->
+<div class="min-w-0">
+
+  <!-- Nom + génération -->
+  <div class="flex items-center gap-2">
+    <p class="text-sm font-medium text-stone-800 capitalize truncate">
+      {p.prenom} {p.nom}
+    </p>
+    {p.generation && (
+      <span class={`inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-medium ${p.generation.color}`}>
+        {p.generation.label}
+      </span>
+    )}
+  </div>
+
+  <!-- Métadonnées -->
+  <div class="flex items-center gap-3 mt-0.5 text-xs text-stone-400">
+    {p.dateNaissance && <span>Né(e) le {formatDateFR(p.dateNaissance)}</span>}
+    {p.dateDeces
+      ? <span>† {p.anneesDeces} · {p.ageDeces} · aurait {p.ageAujourdhui}</span>
+      : p.ageAujourdhui && <span>{p.ageAujourdhui}</span>
+    }
+    {p.email && !p.dateDeces && <span class="truncate">{p.email}</span>}
+  </div>
+
+</div>
+</div>
 
           <!-- Actions -->
           <div class="flex items-center gap-1 shrink-0 ml-4 opacity-60 group-hover:opacity-100 transition-opacity">

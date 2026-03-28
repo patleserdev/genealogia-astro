@@ -16,4 +16,4 @@ const persons = db.collection("persons");
 const relations = db.collection("relations");
 const loginLogs = db.collection("login_logs");
 
-export { db as d, loginLogs as l, persons as p, relations as r };
+export { clientPromise, db, loginLogs, persons, relations };

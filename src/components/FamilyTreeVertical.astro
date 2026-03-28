@@ -269,8 +269,8 @@ function lineFromY(fromId: string, coParentId: string | null): number {
               <a href={`/tree/${p.person._id}`}
                 class={['card', isRoot ? 'card--root' : '', isDeceased ? 'card--deceased' : ''].filter(Boolean).join(' ')}
                 style={`width:${CARD_W}px;height:${CARD_H}px;`}>
-                <span class="card__prenom">{p.person.prenom}</span>
-                <span class="card__nom">{p.person.nom.toUpperCase()}</span>
+                <span class="card__prenom capitalize">{p.person.prenom}</span>
+                <span class="card__nom capitalize">{p.person.nom.toUpperCase()}</span>
                 {isDeceased && p.person.dateDeces &&
                   <span class="card__date">† {formatDateFR(p.person.dateDeces)}</span>}
               </a>
@@ -279,8 +279,8 @@ function lineFromY(fromId: string, coParentId: string | null): number {
                 <a href={`/tree/${coParent._id}`}
                   class={['card','card--conjoint', isDivorced ? 'card--divorced':'', isRoot ? 'card--root':'', cpDeceased ? 'card--deceased':''].filter(Boolean).join(' ')}
                   style={`width:${CARD_W}px;height:${CARD_H}px;`}>
-                  <span class="card__prenom">{coParent.prenom}</span>
-                  <span class="card__nom">{coParent.nom.toUpperCase()}</span>
+                  <span class="card__prenom capitalize">{coParent.prenom}</span>
+                  <span class="card__nom capitalize">{coParent.nom.toUpperCase()}</span>
                   {cpDeceased && coParent.dateDeces &&
                     <span class="card__date">† {formatDateFR(coParent.dateDeces)}</span>}
                 </a>
@@ -297,8 +297,8 @@ function lineFromY(fromId: string, coParentId: string | null): number {
               <a href={`/tree/${p.person._id}`}
                 class={['card','card--hub', isRoot ? 'card--root':'', isDeceased ? 'card--deceased':''].filter(Boolean).join(' ')}
                 style={`width:${CARD_W}px;height:${CARD_H}px;`}>
-                <span class="card__prenom">{p.person.prenom}</span>
-                <span class="card__nom">{p.person.nom.toUpperCase()}</span>
+                <span class="card__prenom capitalize">{p.person.prenom}</span>
+                <span class="card__nom capitalize">{p.person.nom.toUpperCase()}</span>
                 {isDeceased && p.person.dateDeces &&
                   <span class="card__date">† {formatDateFR(p.person.dateDeces)}</span>}
               </a>
@@ -314,16 +314,16 @@ function lineFromY(fromId: string, coParentId: string | null): number {
                   <a href={`/tree/${p.person._id}`}
                     class={['card','card--self', isDeceased ? 'card--deceased':''].filter(Boolean).join(' ')}
                     style={`width:${CARD_W}px;height:${CARD_H}px;`}>
-                    <span class="card__prenom">{p.person.prenom}</span>
-                    <span class="card__nom">{p.person.nom.toUpperCase()}</span>
+                    <span class="card__prenom capitalize">{p.person.prenom}</span>
+                    <span class="card__nom capitalize">{p.person.nom.toUpperCase()}</span>
                   </a>
                   {cp && <>
                     <div class={`sep${isDivorced ? ' sep--divorced':''}`}>{isDivorced ? '✂' : '♥'}</div>
                     <a href={`/tree/${cp._id}`}
                       class={['card','card--conjoint', isDivorced ? 'card--divorced':'', cpDeceased ? 'card--deceased':''].filter(Boolean).join(' ')}
                       style={`width:${CARD_W}px;height:${CARD_H}px;`}>
-                      <span class="card__prenom">{cp.prenom}</span>
-                      <span class="card__nom">{cp.nom.toUpperCase()}</span>
+                      <span class="card__prenom capitalize">{cp.prenom}</span>
+                      <span class="card__nom capitalize">{cp.nom.toUpperCase()}</span>
                       {cpDeceased && cp.dateDeces &&
                         <span class="card__date">† {formatDateFR(cp.dateDeces)}</span>}
                     </a>

@@ -1,8 +1,8 @@
-import { e as createComponent, k as renderComponent, l as renderScript, r as renderTemplate, h as createAstro, m as maybeRenderHead, g as addAttribute, o as Fragment } from '../chunks/astro/server_Cr2bBY3R.mjs';
+import { e as createComponent, k as renderComponent, l as renderScript, r as renderTemplate, h as createAstro, m as maybeRenderHead, g as addAttribute, o as Fragment } from '../chunks/astro/server_DzJdx5CC.mjs';
 import 'piccolore';
-import { $ as $$DeleteButton } from '../chunks/DeleteButton_efOkMzT5.mjs';
-import { $ as $$Baselayout } from '../chunks/Baselayout_BtxBugC6.mjs';
-import { d as db, r as relations, p as persons } from '../chunks/mongo_pJhMhjwv.mjs';
+import { $ as $$DeleteButton } from '../chunks/DeleteButton_CFEt0z3d.mjs';
+import { $ as $$Baselayout } from '../chunks/Baselayout_DbP0pFxM.mjs';
+import { db, relations, persons } from '../chunks/mongo_DDLBCJZd.mjs';
 import { ObjectId } from 'mongodb';
 import { f as formatFullName } from '../chunks/formatName_BxoIGF2R.mjs';
 import { f as formatDateFR } from '../chunks/formatDate_DWbQ-kky.mjs';

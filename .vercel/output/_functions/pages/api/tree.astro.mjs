@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { p as persons, r as relations } from '../../chunks/mongo_pJhMhjwv.mjs';
+import { persons, relations } from '../../chunks/mongo_DDLBCJZd.mjs';
 export { renderers } from '../../renderers.mjs';
 
 const GET = async ({ url }) => {

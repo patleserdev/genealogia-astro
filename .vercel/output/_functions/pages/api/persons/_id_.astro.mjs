@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { p as persons } from '../../../chunks/mongo_pJhMhjwv.mjs';
+import { persons } from '../../../chunks/mongo_DDLBCJZd.mjs';
 export { renderers } from '../../../renderers.mjs';
 
 const PATCH = async ({ params, request }) => {
