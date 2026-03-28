@@ -1,75 +1,70 @@
 import type { APIRoute } from "astro";
-import { db, relations } from "../../../lib/mongo";
 import { ObjectId } from "mongodb";
-import type { Relation } from "../../../models/Relation";
-export const prerender = false;
+import { db } from "../../../lib/mongo.ts";
 
 export const GET: APIRoute = async ({ params }) => {
-  const personId = new ObjectId(params.id)
+  const personId = new ObjectId(params.id);
 
-  const relations = await db.collection('relations').find({
+  const allRelations = await db.collection('relations').find({
     $or: [{ from: personId }, { to: personId }]
-  }).toArray()
+  }).toArray();
 
-  // Collecter tous les IDs liés
-  const linkedIds = relations.map(r =>
+  // Collecter tous les IDs directs
+  const linkedIds = allRelations.map(r =>
     r.from.equals(personId) ? r.to : r.from
-  )
-
-  const persons = await db.collection('persons')
-    .find({ _id: { $in: linkedIds } })
-    .toArray()
-
-  const byId = Object.fromEntries(persons.map(p => [p._id.toString(), p]))
-
-  const parents   = relations
-    .filter(r => r.type === 'PARENT' && r.to.equals(personId))
-    .map(r => byId[r.from.toString()])
-    .filter(Boolean)
-
-  const enfants   = relations
-    .filter(r => r.type === 'PARENT' && r.from.equals(personId))
-    .map(r => byId[r.to.toString()])
-    .filter(Boolean)
-
-  const conjoints = relations
-    .filter(r => r.type === 'CONJOINT')
-    .map(r => byId[(r.from.equals(personId) ? r.to : r.from).toString()])
-    .filter(Boolean)
-
-  return new Response(JSON.stringify({ parents, enfants, conjoints }))
-}
-
-export const PATCH: APIRoute = async ({ request, params }) => {
-  const body = await request.json();
-  const { status } = body;
-
-  if (body.from === body.to) {
-    return new Response(
-      JSON.stringify({ error: "Une personne ne peut pas avoir une relation avec elle-même." }),
-      { status: 400 }
-    );
-  }
-  
-  const payload = {
-    from: new ObjectId(body.from),
-    to: new ObjectId(body.to),
-    type: body.type,
-    status: body.status,
-    dateDebut: body.dateDebut ?? undefined,
-    dateFin: body.dateFin ?? undefined,
-    ...(body.coupleRelationId ? { coupleRelationId: new ObjectId(body.coupleRelationId) } : {}),
-  };
-  await relations.updateOne(
-    { _id: new ObjectId(params.id) },
-    { $set: { ...payload } }
   );
 
-  return new Response(JSON.stringify({ _id: params.id, status }), { status: 200 });
-};
+  // Récupérer aussi les seconds parents via coupleRelationId
+  const parentRels = allRelations.filter(r =>
+    r.type === 'PARENT' && r.to.equals(personId)
+  );
 
+  const extraParentIds: ObjectId[] = [];
+  for (const rel of parentRels) {
+    if (rel.coupleRelationId) {
+      const coupleRel = await db.collection('relations').findOne({
+        _id: rel.coupleRelationId
+      });
+      if (coupleRel) {
+        const otherId = coupleRel.from.equals(rel.from)
+          ? coupleRel.to
+          : coupleRel.from;
+        // N'ajouter que si pas déjà dans les relations directes
+        if (!linkedIds.some(id => id.equals(otherId))) {
+          extraParentIds.push(otherId);
+        }
+      }
+    }
+  }
 
-export const DELETE: APIRoute = async ({ params }) => {
-  await relations.deleteOne({ _id: new ObjectId(params.id) });
-  return new Response(null, { status: 204 });
+  const allIds = [...linkedIds, ...extraParentIds];
+
+  const persons = await db.collection('persons')
+    .find({ _id: { $in: allIds } })
+    .toArray();
+
+  const byId = Object.fromEntries(persons.map(p => [p._id.toString(), p]));
+
+  const parents = [
+    // Parents directs
+    ...allRelations
+      .filter(r => r.type === 'PARENT' && r.to.equals(personId))
+      .map(r => byId[r.from.toString()]),
+    // Second parent via coupleRelationId
+    ...extraParentIds.map(id => byId[id.toString()]),
+  ].filter(Boolean);
+
+  const enfants = allRelations
+    .filter(r => r.type === 'PARENT' && r.from.equals(personId))
+    .map(r => byId[r.to.toString()])
+    .filter(Boolean);
+
+  const conjoints = allRelations
+    .filter(r => r.type === 'CONJOINT')
+    .map(r => byId[(r.from.equals(personId) ? r.to : r.from).toString()])
+    .filter(Boolean);
+
+  return new Response(JSON.stringify({ parents, enfants, conjoints }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
 };
