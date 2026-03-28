@@ -142,7 +142,7 @@ function buildTree(rootId: string, depthUp = 1, depthDown = 2) {
   return buildNode(rootId, depthUp, depthDown);
 }
 
-const tree          = buildTree(personId.toString(), 1, 2);
+const tree          = buildTree(personId.toString(), 1, 4);
 const rootParentIds = parentMap.get(personId.toString()) ?? [];
 const parentId      = rootParentIds[0] ?? null;
 

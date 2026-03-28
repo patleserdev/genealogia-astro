@@ -164,6 +164,112 @@ for (const rel of parentRels) {
     }
   }
 }
+
+// ── Timeline ─────────────────────────────────────────────────────────────
+interface TimelineEvent {
+  date: string;
+  type: 'birth' | 'death' | 'union' | 'separation';
+  label: string;
+  personName: string;
+  personId: string;
+  level: 'parent' | 'self' | 'child' | 'grandchild'| 'sibling';
+}
+
+const timelineEvents: TimelineEvent[] = [];
+
+// Helpers
+function addBirth(p: any, level: TimelineEvent['level']) {
+  if (p?.dateNaissance) timelineEvents.push({
+    date: new Date(p.dateNaissance).toISOString(),
+    type: 'birth',
+    label: 'Naissance',
+    personName: formatFullName(p.prenom, p.nom),
+    personId: p._id.toString(),
+    level,
+  });
+}
+
+function addDeath(p: any, level: TimelineEvent['level']) {
+  if (p?.dateDeces) timelineEvents.push({
+    date: new Date(p.dateDeces).toISOString(),
+    type: 'death',
+    label: 'Décès',
+    personName: formatFullName(p.prenom, p.nom),
+    personId: p._id.toString(),
+    level,
+  });
+}
+
+// Soi-même
+addBirth(person, 'self');
+addDeath(person, 'self');
+
+// Parents
+for (const p of parentObjs) { addBirth(p, 'parent'); addDeath(p, 'parent'); }
+
+// Frères & sœurs
+for (const s of siblings) { addBirth(s, 'sibling'); addDeath(s, 'sibling'); }
+// Unions de la personne
+for (const entry of spouseEntries) {
+  if (entry.dateDebut) timelineEvents.push({
+    date: new Date(entry.dateDebut).toISOString(),
+
+    type: 'union',
+    label: entry.status === 'ACTIVE' ? 'Mariage / union' : 'Union',
+    personName: entry.spousePerson
+      ? formatFullName(entry.spousePerson.prenom, entry.spousePerson.nom)
+      : 'Inconnu(e)',
+    personId: entry.spousePerson?._id?.toString() ?? '',
+    level: 'self',
+  });
+  if (entry.dateFin) timelineEvents.push({
+    date: new Date(entry.dateFin).toISOString(),
+    type: 'separation',
+    label: 'Séparation',
+    personName: entry.spousePerson
+      ? formatFullName(entry.spousePerson.prenom, entry.spousePerson.nom)
+      : 'Inconnu(e)',
+    personId: entry.spousePerson?._id?.toString() ?? '',
+    level: 'self',
+  });
+
+  // Enfants de ce couple
+  for (const c of entry.children) { addBirth(c, 'child'); addDeath(c, 'child'); }
+}
+
+// Enfants orphelins
+for (const c of orphanChildren) { addBirth(c, 'child'); addDeath(c, 'child'); }
+
+// Petits-enfants (enfants des enfants)
+const allChildren = [
+  ...spouseEntries.flatMap(e => e.children),
+  ...orphanChildren,
+];
+for (const child of allChildren) {
+  const grandchildRels = await relations.find({
+    type: 'PARENT',
+    from: child._id,
+  }).toArray();
+  const grandchildIds = grandchildRels.map(r =>
+    typeof r.to === 'string' ? new ObjectId(r.to) : r.to
+  );
+  if (grandchildIds.length > 0) {
+    const grandchildren = await persons.find({ _id: { $in: grandchildIds } }).toArray();
+    for (const gc of grandchildren) { addBirth(gc, 'grandchild'); addDeath(gc, 'grandchild'); }
+  }
+}
+
+const personBirthDate = person.dateNaissance ? new Date(person.dateNaissance) : null;
+
+
+// Tri chronologique
+timelineEvents.sort((a, b) =>
+  new Date(a.date).getTime() - new Date(b.date).getTime()
+);
+
+const filteredTimeline = personBirthDate
+  ? timelineEvents.filter(ev => new Date(ev.date) >= personBirthDate)
+  : timelineEvents;
 ---
 
 <Baselayout title={`${formatFullName(person.prenom, person.nom)}`}>
@@ -448,5 +554,163 @@ for (const rel of parentRels) {
       )}
 
     </div>
+<!-- Timeline -->
+<!-- Timeline -->
+{filteredTimeline.length > 0 && (
+  <div class="bg-white border border-stone-200 rounded-xl p-6">
+
+    <div class="flex items-center gap-2 mb-4">
+      <div class="w-6 h-6 rounded-md bg-stone-100 flex items-center justify-center">
+        <svg class="w-3.5 h-3.5 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <h3 class="text-xs font-semibold text-stone-500 uppercase tracking-wider">Timeline familiale</h3>
+      <span class="ml-auto text-xs text-stone-400" id="tl-count">{filteredTimeline.length} événements</span>
+    </div>
+
+    <!-- Filtres niveau (multi-sélection) -->
+<div class="flex flex-wrap gap-2 mb-6">
+  {[
+    { key: 'all',        label: 'Tous',            color: 'bg-stone-800 text-white border border-stone-800'              },
+    { key: 'parent',     label: 'Parents',         color: 'bg-amber-50 text-amber-700 border border-amber-200'          },
+    { key: 'self',       label: 'Moi',             color: 'bg-stone-100 text-stone-700 border border-stone-300'         },
+    { key: 'sibling',    label: 'Frères & sœurs',  color: 'bg-teal-50 text-teal-700 border border-teal-200'             },
+    { key: 'child',      label: 'Enfants',         color: 'bg-blue-50 text-blue-700 border border-blue-200'             },
+    { key: 'grandchild', label: 'Petits-enfants',  color: 'bg-violet-50 text-violet-700 border border-violet-200'       },
+  ].map(f => (
+    <button data-filter={f.key}
+      class={`tl-filter px-3 py-1 rounded-full text-xs font-medium transition-all border ${f.color}`}>
+      {f.label}
+    </button>
+  ))}
+</div>
+
+    <div class="relative">
+      <div class="absolute left-[7px] top-0 bottom-0 w-px bg-stone-100"></div>
+
+      <ul class="space-y-5" id="tl-list">
+        {filteredTimeline.map(ev => {
+          const icons = {
+            birth:      { bg: 'bg-emerald-50',  border: 'border-emerald-200', dot: 'bg-emerald-400', text: 'text-emerald-700', icon: '✦' },
+            death:      { bg: 'bg-stone-50',     border: 'border-stone-200',  dot: 'bg-stone-400',   text: 'text-stone-500',   icon: '†' },
+            union:      { bg: 'bg-pink-50',      border: 'border-pink-200',   dot: 'bg-pink-400',    text: 'text-pink-700',    icon: '♥' },
+            separation: { bg: 'bg-orange-50',    border: 'border-orange-200', dot: 'bg-orange-400',  text: 'text-orange-700',  icon: '✂' },
+          };
+          const levelLabels = {
+  parent:     { label: 'Parent',          color: 'bg-amber-50 text-amber-700'    },
+  self:       { label: 'Moi',             color: 'bg-stone-800 text-stone-100'   },
+  sibling:    { label: 'Frère / Sœur',   color: 'bg-teal-50 text-teal-700'      },
+  child:      { label: 'Enfant',          color: 'bg-blue-50 text-blue-700'      },
+  grandchild: { label: 'Petit-enfant',    color: 'bg-violet-50 text-violet-700'  },
+};
+          const s = icons[ev.type];
+          const l = levelLabels[ev.level];
+
+          return (
+            <li class="tl-item flex gap-4 pl-1" data-level={ev.level}>
+              <div class="relative flex-shrink-0 mt-1">
+                <div class={`w-3.5 h-3.5 rounded-full border-2 border-white ${s.dot} shadow-sm z-10 relative`}></div>
+              </div>
+              <div class={`flex-1 rounded-lg border px-4 py-3 ${s.bg} ${s.border}`}>
+                <div class="flex items-start justify-between gap-2 flex-wrap">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class={`text-xs font-semibold ${s.text}`}>{s.icon} {ev.label}</span>
+                    <span class={`text-xs px-1.5 py-0.5 rounded-full font-medium ${l.color}`}>{l.label}</span>
+                  </div>
+                  <span class="text-xs text-stone-400 font-mono shrink-0">{formatDateFR(ev.date)}</span>
+                </div>
+                <a href={`/persons/${ev.personId}`}
+                  class="mt-1 block text-sm font-medium text-stone-700 hover:text-amber-700 transition-colors">
+                  {ev.personName}
+                </a>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <!-- Aucun résultat -->
+      <p id="tl-empty" class="hidden text-sm text-stone-400 text-center py-6">
+        Aucun événement pour ce filtre
+      </p>
+    </div>
+  </div>
+)}
+
+<script>
+  const filterBtns = document.querySelectorAll<HTMLButtonElement>('.tl-filter');
+  const items      = document.querySelectorAll<HTMLElement>('.tl-item');
+  const empty      = document.getElementById('tl-empty')!;
+  const count      = document.getElementById('tl-count')!;
+
+  // Styles actif / inactif par filtre
+  const activeStyles: Record<string, string> = {
+    all:        'bg-stone-800 text-white border-stone-800',
+    parent:     'bg-amber-100 text-amber-800 border-amber-300',
+    self:       'bg-stone-200 text-stone-800 border-stone-400',
+    sibling:    'bg-teal-100 text-teal-800 border-teal-300',
+    child:      'bg-blue-100 text-blue-800 border-blue-300',
+    grandchild: 'bg-violet-100 text-violet-800 border-violet-300',
+  };
+  const inactiveStyles: Record<string, string> = {
+    all:        'bg-white text-stone-400 border-stone-200',
+    parent:     'bg-white text-stone-400 border-stone-200',
+    self:       'bg-white text-stone-400 border-stone-200',
+    sibling:    'bg-white text-stone-400 border-stone-200',
+    child:      'bg-white text-stone-400 border-stone-200',
+    grandchild: 'bg-white text-stone-400 border-stone-200',
+  };
+
+  const selected = new Set<string>();
+
+  function setBtn(btn: HTMLButtonElement, isActive: boolean) {
+    const key = btn.dataset.filter!;
+    const add = isActive ? activeStyles[key] : inactiveStyles[key];
+    const rem = isActive ? inactiveStyles[key] : activeStyles[key];
+    rem.split(' ').forEach(c => btn.classList.remove(c));
+    add.split(' ').forEach(c => btn.classList.add(c));
+  }
+
+  function applyFilters() {
+    const showAll = selected.size === 0 || selected.has('all');
+
+    filterBtns.forEach(btn => {
+      const key = btn.dataset.filter!;
+      const isActive = showAll
+        ? key === 'all'
+        : selected.has(key) && key !== 'all';
+      setBtn(btn, isActive);
+    });
+
+    let visible = 0;
+    items.forEach(item => {
+      const show = showAll || selected.has(item.dataset.level!);
+      item.classList.toggle('hidden', !show);
+      if (show) visible++;
+    });
+
+    empty.classList.toggle('hidden', visible > 0);
+    count.textContent = `${visible} événement${visible > 1 ? 's' : ''}`;
+  }
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.filter!;
+      if (key === 'all') {
+        selected.clear();
+      } else {
+        selected.delete('all');
+        if (selected.has(key)) selected.delete(key);
+        else selected.add(key);
+      }
+      applyFilters();
+    });
+  });
+
+  applyFilters();
+</script>
+    
   </div>
 </Baselayout>

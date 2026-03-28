@@ -8,7 +8,7 @@ let currentUser = null
 if (token) {
   try { currentUser = verifyToken(token) } catch {}
 }
-const registrationEnabled = import.meta.env.PUBLIC_REGISTRATION_ENABLED !== 'false'
+const registrationEnabled = import.meta.env.DEMO_MODE !== 'false'
 
 const data = await persons.find({ active: true }).toArray();
 const today = new Date();
