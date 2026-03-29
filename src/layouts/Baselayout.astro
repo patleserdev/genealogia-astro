@@ -12,8 +12,7 @@ if (token) {
   } catch {}
 }
 
-const registrationEnabled =
-  import.meta.env.DEMO_MODE !== "false";
+const registrationEnabled = import.meta.env.DEMO_MODE !== "false";
 
 const nav = [
   { href: "/", label: "Accueil" },
@@ -38,41 +37,49 @@ const nav = [
       html {
         overflow-y: scroll;
       }
-    
+
       @view-transition {
         navigation: auto;
       }
-    
+
       ::view-transition-old(root),
       ::view-transition-new(root) {
         animation: none;
       }
-    
+
       ::view-transition-old(hero-banner),
       ::view-transition-new(hero-banner) {
         animation: none;
       }
-    
+
       /* Sortie : l'ancienne page disparaît */
       ::view-transition-old(main-content) {
         animation: 150ms ease-in both fade-out;
       }
-    
+
       /* Entrée : la nouvelle page apparaît APRÈS la sortie */
       ::view-transition-new(main-content) {
         animation: 200ms ease-out 150ms both fade-in;
       }
-    
+
       @keyframes fade-out {
-        from { opacity: 1; }
-        to   { opacity: 0; }
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
       }
-    
+
       @keyframes fade-in {
-        from { opacity: 0; }
-        to   { opacity: 1; }
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
       }
-    </style> 
+    </style>
   </head>
 
   <body class="bg-stone-50 text-stone-900 font-sans min-h-screen flex flex-col">
@@ -198,7 +205,7 @@ const nav = [
                     href="/register"
                     class="px-3 py-1.5 rounded-lg text-sm bg-amber-600 hover:bg-amber-700 text-white transition-colors font-medium"
                   >
-                    S'inscrire
+                    S\'inscrire
                   </a>
                 )}
               </div>
@@ -228,8 +235,7 @@ const nav = [
     <!-- Mobile menu -->
     <div
       id="mobileMenu"
-      transition:persist
-      class="hidden lg:hidden bg-white border-b border-stone-200 px-4 py-3 space-y-0.5"
+      class="hidden fixed top-14 left-0 right-0 z-40 bg-white border-b border-stone-200 px-4 py-3 space-y-0.5"
     >
       {
         nav.map(({ href, label }) => (
@@ -306,55 +312,120 @@ const nav = [
     </footer>
 
     <script>
-      function initNav() {
-        document.documentElement.style.setProperty(
-          "--scrollbar-width",
-          `${window.innerWidth - document.documentElement.clientWidth}px`,
-        );
-        // Burger
+      let burgerInitialized = false;
+
+      function initMenu() {
         const burger = document.getElementById("burger");
         const mobileMenu = document.getElementById("mobileMenu");
-        const b1 = document.getElementById("b1");
-        const b2 = document.getElementById("b2");
-        const b3 = document.getElementById("b3");
 
-        burger?.addEventListener("click", () => {
-          const open = mobileMenu?.classList.toggle("hidden") === false;
-          if (open) {
-            b1?.classList.add("translate-y-2", "rotate-45");
-            b2?.classList.add("opacity-0");
-            b3?.classList.add("-translate-y-2", "-rotate-45");
-          } else {
-            b1?.classList.remove("translate-y-2", "rotate-45");
-            b2?.classList.remove("opacity-0");
-            b3?.classList.remove("-translate-y-2", "-rotate-45");
-          }
-        });
+        if (!burger || !mobileMenu) return;
 
-        // Fermer au clic lien mobile
-        mobileMenu?.querySelectorAll("a").forEach((a) => {
-          a.addEventListener("click", () => {
-            mobileMenu.classList.add("hidden");
-            b1?.classList.remove("translate-y-2", "rotate-45");
-            b2?.classList.remove("opacity-0");
-            b3?.classList.remove("-translate-y-2", "-rotate-45");
+        const spans = burger.querySelectorAll("span");
+        const [b1, b2, b3] = Array.from(spans);
+
+        function close() {
+          mobileMenu?.classList.add("hidden");
+          b1?.classList.remove("translate-y-2", "rotate-45");
+          b2?.classList.remove("opacity-0");
+          b3?.classList.remove("-translate-y-2", "-rotate-45");
+        }
+
+        close();
+
+        // N'attacher le listener burger qu'une seule fois
+        if (!burgerInitialized) {
+          burgerInitialized = true;
+
+          burger.addEventListener("click", () => {
+            const isOpen = mobileMenu.classList.toggle("hidden") === false;
+            b1?.classList.toggle("translate-y-2", isOpen);
+            b1?.classList.toggle("rotate-45", isOpen);
+            b2?.classList.toggle("opacity-0", isOpen);
+            b3?.classList.toggle("-translate-y-2", isOpen);
+            b3?.classList.toggle("-rotate-45", isOpen);
           });
+
+          window
+            .matchMedia("(min-width: 1024px)")
+            .addEventListener("change", (e) => {
+              if (e.matches) close();
+            });
+        }
+
+        // Liens du menu mobile — re-attacher à chaque navigation car le menu est dans le <body> qui change
+        mobileMenu.querySelectorAll("a").forEach((a) => {
+          a.addEventListener("click", close);
         });
 
-        // Lien actif
+        // Liens actifs
         const path = window.location.pathname;
         document.querySelectorAll("[data-navlink]").forEach((a) => {
           a.classList.remove("text-stone-800", "bg-stone-100");
-          a.classList.add("text-stone-500", "text-stone-600");
+          a.classList.add("text-stone-500");
           if (a.getAttribute("href") === path) {
             a.classList.add("text-stone-800", "bg-stone-100");
-            a.classList.remove("text-stone-500", "text-stone-600");
+            a.classList.remove("text-stone-500");
           }
         });
       }
 
-      // Premier chargement + après chaque navigation
-      document.addEventListener("astro:page-load", initNav);
+      function initScrollbar() {
+        document.documentElement.style.setProperty(
+          "--scrollbar-width",
+          `${window.innerWidth - document.documentElement.clientWidth}px`,
+        );
+      }
+
+      function initBackToTop() {
+        const btn = document.getElementById("back-to-top");
+        if (!btn) return;
+
+        const toggle = () => {
+          const past50vh = window.scrollY > window.innerHeight * 0.5;
+          btn.classList.toggle("opacity-0", !past50vh);
+          btn.classList.toggle("translate-y-4", !past50vh);
+          btn.classList.toggle("pointer-events-none", !past50vh);
+        };
+
+        window.addEventListener("scroll", toggle, { passive: true });
+        toggle(); // état initial
+
+        btn.addEventListener("click", () => {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        initScrollbar();
+        initMenu();
+        initBackToTop()
+      });
+
+      document.addEventListener("astro:page-load", () => {
+        initScrollbar();
+        initMenu();
+        initBackToTop()
+      });
     </script>
+
+    <!-- Back to top -->
+    <button
+      id="back-to-top"
+      aria-label="Retour en haut"
+      class="fixed bottom-6 right-6 z-50 w-10 h-10 rounded-full bg-amber-600 hover:bg-amber-700 text-white shadow-lg flex items-center justify-center transition-all duration-300 opacity-0 translate-y-4 pointer-events-none"
+    >
+      <svg
+        class="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M5 15l7-7 7 7"></path>
+      </svg>
+    </button>
   </body>
 </html>
