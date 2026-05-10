@@ -7,7 +7,17 @@ vi.mock("../../lib/mongo", () => ({
     insertOne: vi.fn(),
   },
   user_persons: {
-    insertOne: vi.fn(),
+    insertMany: vi.fn().mockResolvedValue({
+      acknowledged: true,
+      insertedCount: 1,
+    }),
+  },
+  users: {
+    find: vi.fn().mockReturnValue({
+      project: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([]),
+      }),
+    }),
   },
   relations: {
     insertOne: vi.fn(),
