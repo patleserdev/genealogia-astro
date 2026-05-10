@@ -9,24 +9,13 @@ if (!token) return Astro.redirect("/");
 <Baselayout title="Rejoindre l’arbre">
   <div class="h-full flex items-center justify-center bg-stone-50 px-6 py-10">
     <div class="w-full max-w-lg">
-      <div
-        class="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 space-y-6"
-      >
+      <div class="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 space-y-6">
+
         <!-- Header -->
         <div class="text-center">
-          <div
-            class="w-12 h-12 mx-auto rounded-full bg-amber-100 flex items-center justify-center mb-3"
-          >
-            <svg
-              class="w-6 h-6 text-amber-700"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.5"
+          <div class="w-12 h-12 mx-auto rounded-full bg-amber-100 flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                 d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1"></path>
             </svg>
           </div>
@@ -74,13 +63,10 @@ if (!token) return Astro.redirect("/");
               class="input"
             />
 
-            <!-- strength -->
             <div class="mt-2 flex gap-1">
-              <div class="bar"></div><div class="bar"></div><div class="bar">
-              </div><div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
             </div>
 
-            <!-- rules -->
             <div class="rules mt-2 text-xs grid grid-cols-2 gap-2">
               <span data-rule="length">8 caractères</span>
               <span data-rule="upper">Majuscule</span>
@@ -101,18 +87,10 @@ if (!token) return Astro.redirect("/");
             <p id="matchMsg" class="text-xs mt-1 hidden"></p>
           </div>
 
-          <!-- Recherche -->
+          <!-- SEARCH -->
           <div class="relative">
-            <input
-              id="search"
-              placeholder="Déjà dans l’arbre ?"
-              class="input"
-            />
-            <ul
-              id="results"
-              class="absolute z-10 w-full bg-white border rounded-xl mt-1"
-            >
-            </ul>
+            <input id="search" placeholder="Déjà dans l’arbre ?" class="input" />
+            <ul id="results" class="absolute z-10 w-full bg-white border rounded-xl mt-1"></ul>
             <input type="hidden" name="personId" id="personId" />
           </div>
 
@@ -120,10 +98,7 @@ if (!token) return Astro.redirect("/");
           <p id="error" class="hidden text-red-600 text-sm"></p>
 
           <!-- Submit -->
-          <button
-            id="btn"
-            class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg"
-          >
+          <button id="btn" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg">
             Créer mon compte
           </button>
         </form>
@@ -134,24 +109,26 @@ if (!token) return Astro.redirect("/");
   <script>
     const form = document.getElementById("form");
     const token = form?.dataset.token;
+    const inviteToken = token; // ✅ FIX IMPORTANT
 
     const res = await fetch(`/api/invitations/validate?token=${token}`);
 
     if (!res.ok) {
       document.body.innerHTML = `
-    <div class="h-screen flex items-center justify-center text-stone-600">
-      Invitation invalide ou expirée
-    </div>
-  `;
+        <div class="h-screen flex items-center justify-center text-stone-600">
+          Invitation invalide ou expirée
+        </div>
+      `;
       throw new Error();
     }
 
     const invitation = await res.json();
-    const emailInput = document.getElementById("email") as HTMLInputElement;
+    const emailInput = document.getElementById("email");
 
     emailInput.value = invitation.toEmail ?? "";
     emailInput.readOnly = true;
- 
+
+    /* RULES */
     const RULES = {
       length: (v) => v.length >= 8,
       upper: (v) => /[A-Z]/.test(v),
@@ -191,28 +168,30 @@ if (!token) return Astro.redirect("/");
         : "text-red-500 text-xs";
     });
 
-    /* SEARCH */
+    /* SEARCH FIX */
     const search = document.getElementById("search");
     const results = document.getElementById("results");
 
     let t;
+
     search.addEventListener("input", () => {
       clearTimeout(t);
       const q = search.value.trim();
       if (q.length < 2) return (results.innerHTML = "");
 
       t = setTimeout(async () => {
-        const data = await fetch(`/api/persons/search?q=${q}`).then((r) =>
-          r.json(),
-        );
+        const url = new URL(`/api/persons/search?q=${q}&inviteToken=${token}`, window.location.origin);
+        url.searchParams.set("q", q);
+        url.searchParams.set("inviteToken", inviteToken); // ✅ FIX CRUCIAL
 
-        console.log(data);
+        const data = await fetch(url).then((r) => r.json());
+
         results.innerHTML = data
           .map(
             (p) => `
-      <li data-id="${p._id}" class="px-3 py-2 hover:bg-amber-50 cursor-pointer">
-        ${p.prenom} ${p.nom}
-      </li>`,
+              <li data-id="${p._id}" class="px-3 py-2 hover:bg-amber-50 cursor-pointer">
+                ${p.prenom} ${p.nom}
+              </li>`
           )
           .join("");
       }, 300);
@@ -221,6 +200,7 @@ if (!token) return Astro.redirect("/");
     results.addEventListener("click", (e) => {
       const li = e.target.closest("li");
       if (!li) return;
+
       document.getElementById("personId").value = li.dataset.id;
       search.value = li.textContent;
       results.innerHTML = "";
@@ -266,5 +246,5 @@ if (!token) return Astro.redirect("/");
         btn.textContent = "Créer mon compte";
       }
     });
-  </script></Baselayout
->
+  </script>
+</Baselayout>

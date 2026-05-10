@@ -1,89 +1,101 @@
-// src/middleware.ts
-import { defineMiddleware } from 'astro:middleware'
-import { verifyToken } from './lib/auth'
+import { defineMiddleware } from "astro:middleware";
+import { verifyToken } from "./lib/auth";
+import { db } from "./lib/mongo";
+import { ObjectId } from "mongodb";
 
 const PUBLIC_ROUTES = [
-  '/login',
-  '/register',
-  '/invite',
-  '/forgot-password',
-  '/reset-password',
-  '/api/auth/login',
-  '/api/auth/logout',
-  '/api/auth/register',
-  '/api/auth/forgot-password',
-  '/api/auth/reset-password',
-  '/api/debug',  // ← temporaire
-  '/api/invitations/validate',
-]
+  "/login",
+  "/register",
+  "/invite",
+  "/forgot-password",
+  "/reset-password",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/register",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/debug",
+  "/api/invitations/validate",
+];
 
 const PUBLIC_API_ROUTES = [
-  '/api/persons/search',
-  '/api/invitations/validate',
-  '/api/invitations/accept',
-]
+  "/api/persons/search",
+  "/api/invitations/validate",
+  "/api/invitations/accept",
+];
 
 const OWNER_ROUTES = [
-  '/invitations',
-  '/persons/add-with-relations',
-  '/relations/add-quick',
-  '/api/invitations/create',
-  '/api/invitations/list',
-  '/api/change-requests/review',
-  '/api/users',
-  '/users'
-]
+  "/invitations",
+  "/persons/add-with-relations",
+  "/relations/add-quick",
+  "/api/invitations/create",
+  "/api/invitations/list",
+  "/api/change-requests/review",
+  "/api/users",
+  "/users",
+];
 
-// Pages réservées aux guests (l'owner n'en a pas besoin)
 const GUEST_ROUTES = [
-  '/change-requests/new',
-]
+  "/change-requests/new",
+];
 
 export const onRequest = defineMiddleware(async ({ request, cookies, redirect }, next) => {
-  const url = new URL(request.url)
-  const path = url.pathname
+  const url = new URL(request.url);
+  const path = url.pathname;
 
-  // 1. Routes publiques → on laisse passer sans vérification
-  if (PUBLIC_ROUTES.some(r => path.startsWith(r))) return next()
-
-  if (
+  const isPublic =
     PUBLIC_ROUTES.some(r => path.startsWith(r)) ||
-    PUBLIC_API_ROUTES.some(r => path.startsWith(r))
-  ) {
-    return next()
-  }
+    PUBLIC_API_ROUTES.some(r => path.startsWith(r)) ||
+    path.startsWith("/invite");
 
-  const isInvitePage = path.startsWith('/invite')
+  if (isPublic) return next();
 
-  if (isInvitePage) {
-    return next()
-  }
-  // 2. Vérification du token
-  const token = cookies.get('token')?.value
-  if (!token) return redirect('/login')
+  const token = cookies.get("token")?.value;
+  if (!token) return redirect("/login");
 
-  let payload
+  let payload;
+
   try {
-    payload = verifyToken(token)
-  } catch {
-    return redirect('/login')
-  }
+    payload = verifyToken(token);
 
-  // 3. Routes owner → bloquer les guests
-  if (OWNER_ROUTES.some(r => path.startsWith(r)) && payload.role !== 'OWNER') {
-    if (path.startsWith('/api/')) {
-      return new Response(JSON.stringify({ error: 'Accès refusé' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      })
+    // 🔥 FIX CRITIQUE : check user exists en DB
+    const user = await db.collection("users").findOne({
+      _id: new ObjectId(payload.userId),
+    });
+
+    if (!user) {
+      cookies.delete("token", { path: "/" });
+      return redirect("/login");
     }
-    return redirect('/persons')
+
+    // optionnel : inject user
+    (request as any).user = user;
+  } catch {
+    cookies.delete("token", { path: "/" });
+    return redirect("/login");
   }
 
-  // 4. Routes guest → rediriger l'owner vers ses propres outils
-  if (GUEST_ROUTES.some(r => path.startsWith(r)) && payload.role === 'OWNER') {
-    return redirect('/persons')
+  // OWNER GUARD
+  if (
+    OWNER_ROUTES.some(r => path.startsWith(r)) &&
+    payload.role !== "OWNER"
+  ) {
+    if (path.startsWith("/api/")) {
+      return new Response(JSON.stringify({ error: "Accès refusé" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return redirect("/persons");
   }
 
-  return next()
-})
+  // GUEST GUARD
+  if (
+    GUEST_ROUTES.some(r => path.startsWith(r)) &&
+    payload.role === "OWNER"
+  ) {
+    return redirect("/persons");
+  }
+
+  return next();
+});

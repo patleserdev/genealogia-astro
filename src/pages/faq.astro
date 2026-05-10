@@ -10,7 +10,8 @@ const modules = [
            {"status":"ok",title:"Mot de passe oublié"} ,
            {"status":"ko",title:"Envoi du mail de réinitialisation de mot de passe oublié"} ,
            {"status":"ok",title:"Regénération de mot de passe"} ,
-           {"status":"ko",title:"Envoi du mail de confirmation de regénération de mot de passe"}
+           {"status":"ko",title:"Envoi du mail de confirmation de regénération de mot de passe"},
+           {"status":"ok",title:"Middleware gère bien un cookie invalide (user supprimé par exemple) et permet invitation qui bloquait"}
         ],
     },
     {
@@ -70,6 +71,7 @@ const modules = [
         {"status":"ok",title:"Vue utilisateur"} ,
         {"status":"ok",title:"Vue utilisateur - affichage des demandes de modération"} ,
         {"status":"ok",title:"Vue utilisateur - demande réinitialisation de mot de passe"} ,
+        {"status":"ko",title:"Lors de la création d'une personne, actualiser les userpersons de tous les utilisateurs autorisés"} ,
         ],
     },
     {

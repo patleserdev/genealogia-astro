@@ -5,100 +5,104 @@ import { ObjectId } from "mongodb";
 
 export const GET: APIRoute = async ({ url, cookies }) => {
   const q = url.searchParams.get("q") ?? "";
-
-  const token = cookies.get("token")?.value;
   const inviteToken = url.searchParams.get("inviteToken");
 
-  let mode: "OWNER" | "GUEST" | "PUBLIC" = "PUBLIC";
+  console.log("searching",q)
+  const token = cookies.get("token")?.value;
+
+  let role: "OWNER" | "GUEST" | null = null;
   let userId: ObjectId | null = null;
-  let sharedPersonIds: ObjectId[] = [];
+  let sharedPersonIds: ObjectId[] | null = null;
 
   // ─────────────────────────────
-  // 1. USER CONNECTÉ (cookie)
+  // AUTH USER
   // ─────────────────────────────
   if (token) {
     try {
       const payload = verifyToken(token);
-      mode = payload.role;
+      role = payload.role;
       userId = new ObjectId(payload.userId);
     } catch {
-      return new Response(JSON.stringify([]), { status: 200 });
+      role = null;
     }
   }
 
   // ─────────────────────────────
-  // 2. INVITATION MODE
+  // INVITE MODE (IMPORTANT FIX)
   // ─────────────────────────────
-  if (!token && inviteToken) {
+  if (!role && inviteToken) {
     const inv = await db.collection("invitations").findOne({
       token: inviteToken,
       status: "PENDING",
     });
 
     if (inv) {
-      mode = "GUEST";
       sharedPersonIds = (inv.sharedPersonIds ?? []).map(
         (id: any) => new ObjectId(id)
       );
+      role = "GUEST";
     }
   }
 
-  // ─────────────────────────────
-  // 3. BUILD QUERY
-  // ─────────────────────────────
-  const safeQ = q.trim()
-  let filter: any = {
+  const safeQ = q.trim();
+
+  const baseFilter: any = {
     active: true,
-    $or: [
-      { prenom: { $regex: `^${safeQ}`, $options: "i" } },
-      { nom: { $regex: `^${safeQ}`, $options: "i" } },
-    ]
   };
 
-  // OWNER → tout
-  if (mode === "OWNER") {
-    // rien
+  // recherche seulement si texte
+  if (safeQ.length > 0) {
+    baseFilter.$or = [
+      { prenom: { $regex: safeQ, $options: "i" } },
+      { nom: { $regex: safeQ, $options: "i" } },
+    ];
   }
 
-  // GUEST → invitation uniquement
-  else if (mode === "GUEST") {
-    filter._id = {
-      $in: sharedPersonIds,
-    };
+  // ─────────────────────────────
+  // OWNER
+  // ─────────────────────────────
+  if (role === "OWNER") {
+    // rien → accès total
   }
 
-  // USER connecté → ses personnes
-  else if (mode === "USER" && userId) {
-    const links = await db.collection("user_persons")
+  // ─────────────────────────────
+  // USER LOGGED
+  // ─────────────────────────────
+  else if (role && userId) {
+    console.log('mode user logged')
+    const links = await db
+      .collection("user_persons")
       .find({ userId })
       .project({ personId: 1 })
       .toArray();
 
-    filter._id = {
-      $in: links.map(l => l.personId),
+    baseFilter._id = {
+      $in: links.map((l) => l.personId),
     };
   }
 
-  // PUBLIC + inviteToken valide MAIS sans mode GUEST mal détecté
-  else if (inviteToken && sharedPersonIds.length > 0) {
-    filter._id = {
+  // ─────────────────────────────
+  // INVITE MODE (FIX IMPORTANT)
+  // ─────────────────────────────
+  else if (sharedPersonIds && sharedPersonIds.length > 0) {
+    console.log('mode invte')
+
+    baseFilter._id = {
       $in: sharedPersonIds,
     };
   }
 
-  // PUBLIC pur
+  // ─────────────────────────────
+  // PUBLIC
+  // ─────────────────────────────
   else {
-    // soit tout autoriser :
-    // rien
-
-    // soit bloquer :
-    // filter._id = { $in: [] }
+    console.log('mode public')
+    baseFilter._id = { $in: [] };
   }
-  // ─────────────────────────────
-  // 4. EXECUTE
-  // ─────────────────────────────
-  const persons = await db.collection("persons")
-    .find(filter)
+
+  const persons = await db
+    .collection("persons")
+    .find(baseFilter)
     .limit(10)
     .toArray();
 

@@ -5,6 +5,7 @@ import { users } from "../lib/mongo.ts";
 import Baselayout from "../layouts/Baselayout.astro";
 
 
+
 const token = Astro.cookies.get("token")?.value;
 if (!token) return Astro.redirect("/login");
 
@@ -19,7 +20,16 @@ if (payload.role !== "OWNER") {
   return Astro.redirect("/");
 }
 
-const data = await users.find({}).sort({ createdAt: -1 }).toArray();
+const filter = Astro.url.searchParams.get("filter");
+let query: any = {};
+if (filter === "invitedByMe") {
+  query.invitedBy = new ObjectId(payload.userId);
+}
+
+const data = await users
+  .find(query)
+  .sort({ createdAt: -1 })
+  .toArray();
 
 function formatRole(role: string) {
   if (role === "OWNER") {
@@ -27,6 +37,8 @@ function formatRole(role: string) {
   }
   return { label: "Guest", color: "bg-stone-100 text-stone-500" };
 }
+
+const activeFilter = filter ?? "all";
 ---
 
 <Baselayout title="Utilisateurs">
@@ -72,6 +84,31 @@ function formatRole(role: string) {
           </svg>
           <span id="sort-label">A → Z</span>
         </button>
+      </div>
+      <div class="flex gap-2 text-sm">
+
+        <a
+          href="/users"
+          class={`px-3 py-1 rounded-lg border transition ${
+            activeFilter === "all"
+              ? "bg-stone-900 text-white border-stone-900"
+              : "bg-white text-stone-600 hover:bg-stone-50"
+          }`}
+        >
+          Tous
+        </a>
+      
+        <a
+          href="/users?filter=invitedByMe"
+          class={`px-3 py-1 rounded-lg border transition ${
+            activeFilter === "invitedByMe"
+              ? "bg-amber-600 text-white border-amber-600"
+              : "bg-white text-stone-600 hover:bg-stone-50"
+          }`}
+        >
+          Invités par moi
+        </a>
+      
       </div>
 
     <!-- Liste -->
@@ -137,6 +174,18 @@ function formatRole(role: string) {
                 </svg>
               </a>
 
+              <!-- DELETE -->
+              <button
+                data-id={u._id}
+                class="delete-user p-2 rounded-lg text-stone-500 hover:text-red-600 hover:bg-red-50 transition"
+                title="Supprimer"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+
             </div>
           </div>
         );
@@ -196,4 +245,28 @@ function formatRole(role: string) {
     applyFilterAndSort();
   });
 
+  const deleteButtons = document.querySelectorAll(".delete-user");
+
+deleteButtons.forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const id = btn.dataset.id;
+
+    if (!confirm("Supprimer cet utilisateur ?")) return;
+
+    btn.disabled = true;
+
+    const res = await fetch(`/api/users/${id}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      // 🔥 remove UI instant
+      btn.closest(".user-card")?.remove();
+    } else {
+      const err = await res.json();
+      alert(err.error || "Erreur suppression");
+      btn.disabled = false;
+    }
+  });
+});
 </script>
