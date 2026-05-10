@@ -1,0 +1,353 @@
+---
+// src/pages/invitations.astro
+import Baselayout from "../layouts/Baselayout.astro";
+import { verifyToken } from "../lib/auth.ts";
+import { db, invitations } from "../lib/mongo";
+import { ObjectId } from "mongodb";
+
+const token = Astro.cookies.get('token')?.value
+if (!token) return Astro.redirect('/login')
+
+let payload
+try {
+  payload = verifyToken(token)
+} catch {
+  return Astro.redirect('/login')
+}
+
+if (payload.role !== 'OWNER') return Astro.redirect('/')
+
+const list = await invitations
+  .find({ fromUserId: new ObjectId(payload.userId) })
+  .sort({ createdAt: -1 })
+  .toArray()
+
+const invitationsList = list.map(inv => ({
+  _id:       inv._id!.toString(),
+  toEmail:   inv.toEmail,
+  token:     inv.token,
+  status:    inv.status,
+  createdAt: inv.createdAt.toLocaleDateString('fr-FR'),
+  expiresAt: inv.expiresAt.toLocaleDateString('fr-FR'),
+}))
+
+const statusLabel: Record<string, { label: string; color: string }> = {
+  PENDING:  { label: 'En attente', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  ACCEPTED: { label: 'Acceptée',   color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  EXPIRED:  { label: 'Expirée',    color: 'bg-stone-100 text-stone-400 border-stone-200' },
+}
+---
+
+<Baselayout title="Invitations">
+  <div class="max-w-4xl mx-auto px-6 py-8 space-y-6">
+
+    <!-- En-tête -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">Invitations</h1>
+        <p class="text-sm text-stone-500 mt-0.5">
+          Invitez des membres de votre famille à consulter l'arbre
+        </p>
+      </div>
+      <button
+        id="btn-open-modal"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Inviter
+      </button>
+    </div>
+
+    <!-- Liste invitations -->
+    {invitationsList.length === 0 ? (
+      <div class="text-center py-16 border border-dashed border-stone-200 rounded-xl">
+        <div class="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <p class="text-sm text-stone-400">Aucune invitation envoyée pour l'instant</p>
+      </div>
+    ) : (
+      <div class="space-y-2">
+        {invitationsList.map((inv) => {
+          const s = statusLabel[inv.status]
+          return (
+            <div class="bg-white border border-stone-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:border-stone-300 hover:shadow-sm transition group">
+
+              <!-- Infos -->
+              <div class="flex items-center gap-3 min-w-0 flex-1">
+                <div class="w-9 h-9 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                  <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/>
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-stone-800 truncate">{inv.toEmail}</p>
+                  <p class="text-xs text-stone-400 mt-0.5">
+                    Envoyée le {inv.createdAt} · Expire le {inv.expiresAt}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Statut + actions -->
+              <div class="flex items-center gap-2 shrink-0 border-t border-stone-100 pt-2 sm:border-0 sm:pt-0">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${s.color}`}>
+                  {s.label}
+                </span>
+
+                {inv.status === 'PENDING' && (
+                  <button
+                    class="copy-link p-2 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 transition-colors"
+                    data-link={`/invite?token=${inv.token}`}
+                    title="Copier le lien"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                  </button>
+                )}
+
+                <button
+                  class="delete-inv p-2 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  data-id={inv._id}
+                  title="Supprimer"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+
+            </div>
+          )
+        })}
+      </div>
+    )}
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <!-- Backdrop -->
+    <div id="modal-backdrop" class="absolute inset-0 bg-stone-900/40 backdrop-blur-sm"></div>
+
+    <!-- Fenêtre -->
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-stone-800">Inviter un membre</h2>
+        <button id="btn-close-modal" class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <p class="text-sm text-stone-500">
+        La personne recevra un lien pour créer son compte et consulter l'arbre en lecture.
+      </p>
+
+      <div class="space-y-1">
+        <label class="text-sm font-medium text-stone-700" for="inv-email">Adresse email</label>
+        <input
+          id="inv-email"
+          type="email"
+          placeholder="prenom.nom@email.com"
+          class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+        />
+      </div>
+
+      <div class="space-y-2">
+        <p class="text-sm font-medium text-stone-700">Personnes à partager</p>
+        <label class="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" id="select-all">
+          Tout sélectionner
+        </label>
+      
+        <div id="people-list" class="max-h-40 overflow-auto border rounded-lg p-2 space-y-1"></div>
+      </div>
+
+      <p id="modal-error" class="hidden text-sm text-red-500"></p>
+
+      <!-- Lien généré -->
+      <div id="link-result" class="hidden space-y-2">
+        <p class="text-sm font-medium text-stone-700">Lien d'invitation généré :</p>
+        <div class="flex gap-2">
+          <input
+            id="link-input"
+            type="text"
+            readonly
+            class="flex-1 px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-sm text-stone-700 focus:outline-none"
+          />
+          <button
+            id="copy-generated"
+            class="px-3 py-2 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-600 text-sm font-medium transition-colors"
+          >
+            Copier
+          </button>
+        </div>
+        <p class="text-xs text-stone-400">Envoyez ce lien à votre proche. Il est valable 7 jours.</p>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-1">
+        <button id="btn-cancel" class="px-4 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors">
+          Annuler
+        </button>
+        <button
+          id="btn-invite"
+          class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+        >
+          Générer le lien
+        </button>
+      </div>
+    </div>
+  </div>
+
+</Baselayout>
+
+<script>
+  // ── Modal ────────────────────────────────────────────────
+  const modal    = document.getElementById('modal')!
+  const openBtn  = document.getElementById('btn-open-modal')!
+  const closeBtn = document.getElementById('btn-close-modal')!
+  const cancelBtn = document.getElementById('btn-cancel')!
+  const backdrop = document.getElementById('modal-backdrop')!
+
+  
+  function openModal() {
+    modal.classList.remove('hidden')
+    modal.classList.add('flex')
+  }
+  function closeModal() {
+    modal.classList.add('hidden')
+    modal.classList.remove('flex')
+    // reset
+    ;(document.getElementById('inv-email') as HTMLInputElement).value = ''
+    document.getElementById('modal-error')!.classList.add('hidden')
+    document.getElementById('link-result')!.classList.add('hidden')
+  }
+
+  async function loadPeople() {
+  const res = await fetch('/api/persons')
+  const people = await res.json()
+  if (!Array.isArray(people)) return
+
+  const container = document.getElementById('people-list')
+  if(!container) return
+  container.innerHTML = people.map(p => `
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" value="${p._id}" class="person-checkbox">
+      ${p.prenom} ${p.nom}
+    </label>
+  `).join('')
+}
+
+document.getElementById('select-all')!.addEventListener('change', (e) => {
+  const checked = (e.target as HTMLInputElement).checked
+  document.querySelectorAll('.person-checkbox').forEach(cb => {
+    (cb as HTMLInputElement).checked = checked
+  })
+})
+
+openBtn.addEventListener('click', async () => {
+  openModal()
+  await loadPeople()
+})
+  openBtn.addEventListener('click', openModal)
+  closeBtn.addEventListener('click', closeModal)
+  cancelBtn.addEventListener('click', closeModal)
+  backdrop.addEventListener('click', closeModal)
+
+  // ── Créer invitation ─────────────────────────────────────
+  document.getElementById('btn-invite')!.addEventListener('click', async () => {
+    const emailInput = document.getElementById('inv-email') as HTMLInputElement
+    const errorEl   = document.getElementById('modal-error')!
+    const linkResult = document.getElementById('link-result')!
+    const linkInput  = document.getElementById('link-input') as HTMLInputElement
+    const btn        = document.getElementById('btn-invite') as HTMLButtonElement
+    const sharedPersonIds = Array.from(document.querySelectorAll('.person-checkbox:checked')
+    ).map(el => el.value)
+
+    errorEl.classList.add('hidden')
+    btn.disabled = true
+    btn.textContent = 'Génération…'
+
+    const res = await fetch('/api/invitations/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: emailInput.value ,sharedPersonIds}),
+    })
+
+    const data = await res.json()
+    btn.disabled = false
+    btn.textContent = 'Générer le lien'
+
+   // Dans le listener du bouton btn-invite, remplacer le bloc après res.ok :
+if (!res.ok) {
+  errorEl.textContent = data.error
+  errorEl.classList.remove('hidden')
+  btn.disabled = false
+  btn.textContent = 'Générer le lien'
+  return
+}
+
+    if (data.direct) {
+    // User existant → accès direct, pas de lien
+    linkInput.value = data.message
+    linkResult.classList.remove('hidden')
+    document.getElementById('copy-generated')!.classList.add('hidden')
+    setTimeout(() => window.location.reload(), 1500)
+    } else {
+    // Nouveau user → lien à copier
+    const fullLink = window.location.origin + data.invitationLink
+    linkInput.value = fullLink
+    linkResult.classList.remove('hidden')
+    document.getElementById('copy-generated')!.classList.remove('hidden')
+    setTimeout(() => window.location.reload(), 1000)
+    }
+
+    // Affiche le lien
+    const fullLink = window.location.origin + data.invitationLink
+    linkInput.value = fullLink
+    linkResult.classList.remove('hidden')
+
+    // Rafraîchit la liste après 1s
+    setTimeout(() => window.location.reload(), 1000)
+  })
+
+  // ── Copier lien généré ───────────────────────────────────
+  document.getElementById('copy-generated')!.addEventListener('click', () => {
+    const linkInput = document.getElementById('link-input') as HTMLInputElement
+    navigator.clipboard.writeText(linkInput.value)
+    const btn = document.getElementById('copy-generated')!
+    btn.textContent = 'Copié !'
+    setTimeout(() => btn.textContent = 'Copier', 2000)
+  })
+
+  // ── Copier lien depuis la liste ──────────────────────────
+  document.querySelectorAll<HTMLButtonElement>('.copy-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const link = window.location.origin + btn.dataset.link!
+      navigator.clipboard.writeText(link)
+      const icon = btn.innerHTML
+      btn.innerHTML = `<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>`
+      setTimeout(() => btn.innerHTML = icon, 2000)
+    })
+  })
+
+  // ── Supprimer invitation ─────────────────────────────────
+  document.querySelectorAll<HTMLButtonElement>('.delete-inv').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Supprimer cette invitation ?')) return
+      const res = await fetch(`/api/invitations/${btn.dataset.id}`, { method: 'DELETE' })
+      if (res.ok) window.location.reload()
+    })
+  })
+</script>

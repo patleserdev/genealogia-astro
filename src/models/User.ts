@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 
-export interface Person {
+export interface User {
     _id?: ObjectId;
     active: boolean;
     prenom: string;
@@ -9,6 +9,8 @@ export interface Person {
     password: string,
     dateNaissance?: string;
     createdAt: Date,
-    personId?: ObjectId
+    personId?: ObjectId;
+    role: "OWNER" | "GUEST";
+    invitedBy?: ObjectId;    
 
 }

@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { relations } from "../../lib/mongo";
+import { db, relations } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 import type { Relation } from "../../models/Relation";
 export const prerender = false;
@@ -35,4 +35,19 @@ export const POST: APIRoute = async ({ request }) => {
   return new Response(JSON.stringify(newRelation), { status: 201 });
 };
 
+export async function deleteRelation(id: string) {
+  if (!ObjectId.isValid(id)) {
+    throw new Error("INVALID_ID");
+  }
+
+  const result = await db.collection("relations").deleteOne({
+    _id: new ObjectId(id)
+  });
+
+  if (result.deletedCount === 0) {
+    throw new Error("NOT_FOUND");
+  }
+
+  return true;
+}
 

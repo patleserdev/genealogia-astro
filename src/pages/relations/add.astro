@@ -1,6 +1,6 @@
 ---
 import Baselayout from "../../layouts/Baselayout.astro";
-import { db, persons as personsCol, relations as relationsCol } from "../../lib/mongo";
+import { db, persons as personsCol, relations as relationsCol, user_persons } from "../../lib/mongo";
 import { ObjectId } from "mongodb";
 import { formatDateForInput } from "../../utils/formatDate.ts";
 import { formatFullName } from "../../utils/formatName.ts";
@@ -11,27 +11,55 @@ export const prerender = false;
 const token = Astro.cookies.get('token')?.value
 if (!token) return Astro.redirect('/login')
 
-let user: any   = null
+let user: any = null
+let payload: any = null
 
 try {
-  const payload = verifyToken(token)
-  user   = await db.collection('users').findOne({ _id: new ObjectId(payload.userId) })
- 
+  payload = verifyToken(token)
+  user = await db.collection('users').findOne({ _id: new ObjectId(payload.userId) })
 } catch {
   return Astro.redirect('/login')
 }
 
+// Récupérer les personIds autorisés pour cet utilisateur
+const userId = new ObjectId(payload.userId)
+const links = await user_persons
+  .find({ userId })
+  .project({ personId: 1 })
+  .toArray()
+
+const allowedIds = new Set(links.map(l => l.personId.toString()))
+const allowedObjectIds = links.map(l => l.personId)
+
 const relationId = Astro.url.searchParams.get("id");
 const returnUrl  = Astro.url.searchParams.get("returnUrl") || "/relations";
 
-const persons = await personsCol.find({ active: true }).toArray();
+const persons = await personsCol
+  .find({ active: true, _id: { $in: allowedObjectIds } })
+  .toArray()
 
+// Charger la relation et vérifier qu'elle appartient au périmètre de l'utilisateur
 let relation = null;
 if (relationId && ObjectId.isValid(relationId)) {
-  relation = await relationsCol.findOne({ _id: new ObjectId(relationId) });
+  const candidate = await relationsCol.findOne({ _id: new ObjectId(relationId) });
+  if (
+    candidate &&
+    allowedIds.has(candidate.from.toString()) &&
+    allowedIds.has(candidate.to.toString())
+  ) {
+    relation = candidate;
+  }
 }
 
-const coupleRelations = await relationsCol.find({ type: "CONJOINT" }).toArray();
+const coupleRelations = await relationsCol.find({
+  type: "CONJOINT",
+  $expr: {
+    $and: [
+      { $in: [{ $toString: "$from" }, Array.from(allowedIds)] },
+      { $in: [{ $toString: "$to" },   Array.from(allowedIds)] },
+    ]
+  }
+}).toArray()
 
 function isMajeur(dateNaissance?: string): boolean {
   if (!dateNaissance) return true;
@@ -48,20 +76,20 @@ const personsData = persons
     nom: p.nom,
     majeur: isMajeur(p.dateNaissance),
   }))
-  .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+  .sort((a, b) => a.nom.localeCompare(b.nom, "fr"))
 
-const majeurs = personsData.filter((p) => p.majeur);
+const majeurs = personsData.filter((p) => p.majeur)
 
 const coupleRelationsData = coupleRelations.map((r) => {
-  const p1 = personsData.find((p) => p._id === r.from.toString());
-  const p2 = personsData.find((p) => p._id === r.to.toString());
+  const p1 = personsData.find((p) => p._id === r.from.toString())
+  const p2 = personsData.find((p) => p._id === r.to.toString())
   return {
     _id: r._id!.toString(),
     label: p1 && p2
       ? `${formatFullName(p1.prenom, p1.nom)} & ${formatFullName(p2.prenom, p2.nom)}${r.status === "DIVORCED" ? " (divorcés)" : ""}`
       : r._id!.toString(),
-  };
-});
+  }
+})
 
 const currentCoupleRelationId = relation?.coupleRelationId?.toString() ?? "";
 const isEdit = !!relation;

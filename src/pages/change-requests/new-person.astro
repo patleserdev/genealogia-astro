@@ -1,0 +1,274 @@
+---
+// src/pages/change-requests/new.astro
+import Baselayout from "../../layouts/Baselayout.astro";
+import { verifyToken } from "../../lib/auth.ts";
+import { db, persons } from "../../lib/mongo";
+import { ObjectId } from "mongodb";
+
+const token = Astro.cookies.get('token')?.value
+if (!token) return Astro.redirect('/login')
+
+let payload
+try {
+  payload = verifyToken(token)
+} catch {
+  return Astro.redirect('/login')
+}
+
+// OWNER n'a pas besoin de cette page
+if (payload.role === 'OWNER') return Astro.redirect('/persons')
+
+// Si personId en query string → mode EDIT, sinon mode ADD
+const personId = Astro.url.searchParams.get('personId')
+
+let person = null
+if (personId) {
+  person = await persons.findOne({ _id: new ObjectId(personId), active: true })
+  if (!person) return Astro.redirect('/persons')
+}
+
+const mode = person ? 'UPDATE_PERSON' : 'CREATE_PERSON'
+---
+
+<Baselayout title={mode === 'UPDATE_PERSON' ? 'Proposer une modification' : 'Proposer une personne'}>
+  <div class="max-w-2xl mx-auto px-6 py-8 space-y-6">
+
+    <!-- En-tête -->
+    <div class="flex items-center gap-3">
+      <a href="/persons"
+        class="p-2 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">
+          {mode === 'UPDATE_PERSON' ? 'Proposer une modification' : 'Proposer une personne'}
+        </h1>
+        <p class="text-sm text-stone-500 mt-0.5">
+          {mode === 'UPDATE_PERSON'
+            ? `Votre proposition sera soumise à validation avant d'être appliquée`
+            : `Suggérez l'ajout d'une nouvelle personne à l'arbre`}
+        </p>
+      </div>
+    </div>
+
+    <!-- Bandeau info -->
+    <div class="flex gap-3 px-4 py-3 bg-violet-50 border border-violet-100 rounded-xl text-sm text-violet-700">
+      <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span>
+        {mode === 'UPDATE_PERSON'
+          ? 'Les modifications seront visibles uniquement après validation par le responsable de l\'arbre.'
+          : 'La personne sera ajoutée uniquement après validation par le responsable de l\'arbre.'}
+      </span>
+    </div>
+
+    {mode === 'UPDATE_PERSON' && person && (
+      <!-- Données actuelles -->
+      <div class="bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 space-y-1">
+        <p class="text-xs font-medium text-stone-400 uppercase tracking-wide mb-2">Données actuelles</p>
+        <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+          <span class="text-stone-500">Prénom</span>
+          <span class="text-stone-800 capitalize">{person.prenom}</span>
+          <span class="text-stone-500">Nom</span>
+          <span class="text-stone-800 capitalize">{person.nom}</span>
+          {person.dateNaissance && <>
+            <span class="text-stone-500">Naissance</span>
+            <span class="text-stone-800">{person.dateNaissance}</span>
+          </>}
+          {person.dateDeces && <>
+            <span class="text-stone-500">Décès</span>
+            <span class="text-stone-800">{person.dateDeces}</span>
+          </>}
+          {person.sexe && <>
+            <span class="text-stone-500">Sexe</span>
+            <span class="text-stone-800">{person.sexe}</span>
+          </>}
+          {person.email && <>
+            <span class="text-stone-500">Email</span>
+            <span class="text-stone-800">{person.email}</span>
+          </>}
+        </div>
+      </div>
+    )}
+
+    <!-- Formulaire -->
+    <form id="cr-form" class="space-y-4">
+      {personId && <input type="hidden" name="personId" value={personId} />}
+      <input type="hidden" name="type" value={mode} />
+
+      <div class="bg-white border border-stone-200 rounded-xl p-5 space-y-4">
+        <p class="text-xs font-medium text-stone-400 uppercase tracking-wide">
+          {mode === 'UPDATE_PERSON' ? 'Valeurs proposées' : 'Informations'}
+        </p>
+
+        <!-- Prénom + Nom -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-stone-700" for="prenom">
+              Prénom <span class="text-red-400">*</span>
+            </label>
+            <input
+              id="prenom" name="prenom" type="text" required
+              value={person?.prenom ?? ''}
+              placeholder="Jean"
+              class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+            />
+          </div>
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-stone-700" for="nom">
+              Nom <span class="text-red-400">*</span>
+            </label>
+            <input
+              id="nom" name="nom" type="text" required
+              value={person?.nom ?? ''}
+              placeholder="Dupont"
+              class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+            />
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-stone-700" for="email">Email</label>
+          <input
+            id="email" name="email" type="email"
+            value={person?.email ?? ''}
+            placeholder="jean.dupont@email.com"
+            class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+          />
+        </div>
+
+        <!-- Sexe -->
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-stone-700" for="sexe">Sexe</label>
+          <select
+            id="sexe" name="sexe"
+            class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+          >
+            <option value="">— Non renseigné —</option>
+            <option value="M"     selected={person?.sexe === 'M'}>Masculin</option>
+            <option value="F"     selected={person?.sexe === 'F'}>Féminin</option>
+            <option value="Autre" selected={person?.sexe === 'Autre'}>Autre</option>
+          </select>
+        </div>
+
+        <!-- Dates -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-stone-700" for="dateNaissance">Date de naissance</label>
+            <input
+              id="dateNaissance" name="dateNaissance" type="date"
+              value={person?.dateNaissance ?? ''}
+              class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+            />
+          </div>
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-stone-700" for="dateDeces">Date de décès</label>
+            <input
+              id="dateDeces" name="dateDeces" type="date"
+              value={person?.dateDeces ?? ''}
+              class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+            />
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-stone-700" for="notes">Notes</label>
+          <textarea
+            id="notes" name="notes" rows="3"
+            placeholder="Informations complémentaires…"
+            class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 placeholder-stone-400 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+          >{person?.notes ?? ''}</textarea>
+        </div>
+
+        <!-- Motif (optionnel) -->
+        <div class="space-y-1 pt-1 border-t border-stone-100">
+          <label class="text-sm font-medium text-stone-700" for="reviewNote">
+            Motif de la demande
+            <span class="text-stone-400 font-normal ml-1">(optionnel)</span>
+          </label>
+          <textarea
+            id="reviewNote" name="reviewNote" rows="2"
+            placeholder="Ex : j'ai trouvé une erreur sur la date de naissance…"
+            class="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-900 placeholder-stone-400 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Erreur -->
+      <p id="form-error" class="hidden text-sm text-red-500 px-1"></p>
+
+      <!-- Actions -->
+      <div class="flex justify-end gap-2">
+        <a href="/persons"
+          class="px-4 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors">
+          Annuler
+        </a>
+        <button
+          type="submit"
+          id="btn-submit"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          Envoyer la proposition
+        </button>
+      </div>
+    </form>
+
+  </div>
+</Baselayout>
+
+<script>
+  const form      = document.getElementById('cr-form') as HTMLFormElement
+  const errorEl   = document.getElementById('form-error')!
+  const submitBtn = document.getElementById('btn-submit') as HTMLButtonElement
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    errorEl.classList.add('hidden')
+    submitBtn.disabled = true
+    submitBtn.textContent = 'Envoi…'
+
+    const fd = new FormData(form)
+
+    const proposedData: Record<string, string> = {}
+    for (const field of ['prenom', 'nom', 'email', 'sexe', 'dateNaissance', 'dateDeces', 'notes']) {
+      const val = fd.get(field) as string
+      if (val?.trim()) proposedData[field] = val.trim()
+    }
+
+    const body: Record<string, unknown> = {
+      type:         fd.get('type'),
+      proposedData,
+      reviewNote:   (fd.get('reviewNote') as string)?.trim() || undefined,
+    }
+
+    const personId = fd.get('personId')
+    if (personId) body.personId = personId
+
+    const res = await fetch('/api/change-requests/create', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      errorEl.textContent = data.error
+      errorEl.classList.remove('hidden')
+      submitBtn.disabled = false
+      submitBtn.textContent = 'Envoyer la proposition'
+      return
+    }
+
+    // Succès → retour à la liste avec message
+    window.location.href = '/persons?proposed=1'
+  })
+</script>

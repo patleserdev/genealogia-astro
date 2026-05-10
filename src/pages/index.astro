@@ -1,7 +1,8 @@
 ---
 import Baselayout from "../layouts/Baselayout.astro";
-import { persons } from "../lib/mongo";
+import { persons, user_persons } from "../lib/mongo";
 import { verifyToken } from "../lib/auth";
+import { ObjectId } from "mongodb";
 
 const token = Astro.cookies.get('token')?.value
 let currentUser = null
@@ -10,7 +11,20 @@ if (token) {
 }
 const registrationEnabled = import.meta.env.DEMO_MODE !== 'false'
 
-const data = await persons.find({ active: true }).toArray();
+// Récupérer les personIds autorisés si connecté
+let allowedObjectIds: ObjectId[] = []
+if (currentUser) {
+  const links = await user_persons
+    .find({ userId: new ObjectId(currentUser.userId) })
+    .project({ personId: 1 })
+    .toArray()
+  allowedObjectIds = links.map(l => l.personId)
+}
+
+const data = currentUser
+  ? await persons.find({ active: true, _id: { $in: allowedObjectIds } }).toArray()
+  : []
+
 const today = new Date();
 
 const personsList = data
@@ -174,7 +188,7 @@ const totalPersons = data.length;
                   <div class="flex items-center gap-3">
                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     <div>
-                      <p class="text-sm font-medium text-stone-800">{p.prenom} {p.nom}</p>
+                      <p class="text-sm font-medium text-stone-800 capitalize">{p.prenom} <span class="uppercase">{p.nom}</span></p>
                       <p class="text-xs text-stone-400">Né(e) le {p.dateNaissance}</p>
                     </div>
                   </div>

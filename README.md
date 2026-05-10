@@ -40,4 +40,28 @@ All commands are run from the root of the project, from a terminal:
 
 ## 👀 Want to learn more?
 
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+## Flux complet
+```
+── Invitation ───────────────────────────────────────
+A entre l'email de B → crée une Invitation avec token
+B reçoit un email avec un lien /invite?token=xxx
+B clique → crée son compte (ou connecte) → status ACCEPTED
+B est maintenant GUEST lié à A (invitedBy = A._id)
+
+── Visibilité ───────────────────────────────────────
+OWNER : voit tout, peut tout modifier directement
+GUEST : voit tout l'arbre de son owner (invitedBy)
+        en lecture seule
+
+── Demande de modification/ajout ────────────────────
+B voit une personne → clique "Proposer une modification"
+  → crée un ChangeRequest type EDIT avec proposedData
+B veut ajouter → clique "Proposer une personne"
+  → crée un ChangeRequest type ADD avec proposedData
+
+── Modération (côté A) ──────────────────────────────
+A voit une liste de ChangeRequests PENDING
+A compare currentData vs proposedData
+A accepte → la Person est créée/modifiée directement
+A refuse  → status REJECTED + note optionnelle
+```

@@ -25,7 +25,7 @@ export const GET: APIRoute = async ({ url }) => {
   }
 
   const buildLevels = (rootId: string, depth = 2) => {
-    const levels: any[] = [];
+    const levels: string[][] = [];
 
     let current = [rootId];
     levels.push(current);

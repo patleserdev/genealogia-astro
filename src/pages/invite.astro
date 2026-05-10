@@ -1,0 +1,270 @@
+---
+// src/pages/invite.astro
+import Baselayout from "../layouts/Baselayout.astro";
+
+const token = Astro.url.searchParams.get("token");
+if (!token) return Astro.redirect("/");
+---
+
+<Baselayout title="Rejoindre l’arbre">
+  <div class="h-full flex items-center justify-center bg-stone-50 px-6 py-10">
+    <div class="w-full max-w-lg">
+      <div
+        class="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 space-y-6"
+      >
+        <!-- Header -->
+        <div class="text-center">
+          <div
+            class="w-12 h-12 mx-auto rounded-full bg-amber-100 flex items-center justify-center mb-3"
+          >
+            <svg
+              class="w-6 h-6 text-amber-700"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1"></path>
+            </svg>
+          </div>
+
+          <h1 class="text-xl font-semibold text-stone-800">
+            Invitation à rejoindre l’arbre
+          </h1>
+
+          <p class="text-sm text-stone-500 mt-1">
+            Créez votre compte pour accéder à votre famille
+          </p>
+        </div>
+
+        <!-- Form -->
+        <form id="form" data-token={token} class="space-y-4">
+          <input type="hidden" name="token" value={token} />
+
+          <!-- Nom -->
+          <div class="grid grid-cols-2 gap-3">
+            <input name="prenom" required placeholder="Prénom" class="input" />
+            <input name="nom" required placeholder="Nom" class="input" />
+          </div>
+
+          <!-- Email -->
+          <div class="grid grid-cols-1 gap-3">
+            <input
+              id="email"
+              type="email"
+              name="email"
+              required
+              placeholder="Adresse email"
+              autocomplete="email"
+              class="input"
+            />
+          </div>
+
+          <!-- Password -->
+          <div>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              placeholder="Mot de passe"
+              class="input"
+            />
+
+            <!-- strength -->
+            <div class="mt-2 flex gap-1">
+              <div class="bar"></div><div class="bar"></div><div class="bar">
+              </div><div class="bar"></div>
+            </div>
+
+            <!-- rules -->
+            <div class="rules mt-2 text-xs grid grid-cols-2 gap-2">
+              <span data-rule="length">8 caractères</span>
+              <span data-rule="upper">Majuscule</span>
+              <span data-rule="lower">Minuscule</span>
+              <span data-rule="number">Chiffre</span>
+            </div>
+          </div>
+
+          <!-- Confirm -->
+          <div>
+            <input
+              type="password"
+              id="confirm"
+              required
+              placeholder="Confirmer le mot de passe"
+              class="input"
+            />
+            <p id="matchMsg" class="text-xs mt-1 hidden"></p>
+          </div>
+
+          <!-- Recherche -->
+          <div class="relative">
+            <input
+              id="search"
+              placeholder="Déjà dans l’arbre ?"
+              class="input"
+            />
+            <ul
+              id="results"
+              class="absolute z-10 w-full bg-white border rounded-xl mt-1"
+            >
+            </ul>
+            <input type="hidden" name="personId" id="personId" />
+          </div>
+
+          <!-- Error -->
+          <p id="error" class="hidden text-red-600 text-sm"></p>
+
+          <!-- Submit -->
+          <button
+            id="btn"
+            class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg"
+          >
+            Créer mon compte
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("form");
+    const token = form?.dataset.token;
+
+    const res = await fetch(`/api/invitations/validate?token=${token}`);
+
+    if (!res.ok) {
+      document.body.innerHTML = `
+    <div class="h-screen flex items-center justify-center text-stone-600">
+      Invitation invalide ou expirée
+    </div>
+  `;
+      throw new Error();
+    }
+
+    const invitation = await res.json();
+    const emailInput = document.getElementById("email") as HTMLInputElement;
+
+    emailInput.value = invitation.toEmail ?? "";
+    emailInput.readOnly = true;
+ 
+    const RULES = {
+      length: (v) => v.length >= 8,
+      upper: (v) => /[A-Z]/.test(v),
+      lower: (v) => /[a-z]/.test(v),
+      number: (v) => /[0-9]/.test(v),
+    };
+
+    const password = document.getElementById("password");
+    const confirm = document.getElementById("confirm");
+    const matchMsg = document.getElementById("matchMsg");
+
+    function checkRules(v) {
+      return Object.keys(RULES).filter((r) => RULES[r](v)).length;
+    }
+
+    password.addEventListener("input", () => {
+      const val = password.value;
+      const score = checkRules(val);
+
+      document.querySelectorAll("[data-rule]").forEach((el) => {
+        const ok = RULES[el.dataset.rule](val);
+        el.classList.toggle("text-green-600", ok);
+      });
+
+      const bars = document.querySelectorAll(".bar");
+      bars.forEach((b, i) => {
+        b.className = "bar " + (i < score ? "bg-green-400" : "bg-stone-100");
+      });
+    });
+
+    confirm.addEventListener("input", () => {
+      const ok = password.value === confirm.value;
+      matchMsg.textContent = ok ? "✓ OK" : "✗ différent";
+      matchMsg.classList.remove("hidden");
+      matchMsg.className = ok
+        ? "text-green-600 text-xs"
+        : "text-red-500 text-xs";
+    });
+
+    /* SEARCH */
+    const search = document.getElementById("search");
+    const results = document.getElementById("results");
+
+    let t;
+    search.addEventListener("input", () => {
+      clearTimeout(t);
+      const q = search.value.trim();
+      if (q.length < 2) return (results.innerHTML = "");
+
+      t = setTimeout(async () => {
+        const data = await fetch(`/api/persons/search?q=${q}`).then((r) =>
+          r.json(),
+        );
+
+        console.log(data);
+        results.innerHTML = data
+          .map(
+            (p) => `
+      <li data-id="${p._id}" class="px-3 py-2 hover:bg-amber-50 cursor-pointer">
+        ${p.prenom} ${p.nom}
+      </li>`,
+          )
+          .join("");
+      }, 300);
+    });
+
+    results.addEventListener("click", (e) => {
+      const li = e.target.closest("li");
+      if (!li) return;
+      document.getElementById("personId").value = li.dataset.id;
+      search.value = li.textContent;
+      results.innerHTML = "";
+    });
+
+    /* SUBMIT */
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const error = document.getElementById("error");
+      const btn = document.getElementById("btn");
+
+      if (checkRules(password.value) < 4) {
+        error.textContent = "Mot de passe trop faible";
+        error.classList.remove("hidden");
+        return;
+      }
+
+      if (password.value !== confirm.value) {
+        error.textContent = "Les mots de passe ne correspondent pas";
+        error.classList.remove("hidden");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Création...";
+
+      const data = Object.fromEntries(new FormData(e.target));
+
+      const res = await fetch("/api/invitations/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        window.location.href = "/login";
+      } else {
+        const { error: err } = await res.json();
+        error.textContent = err;
+        error.classList.remove("hidden");
+        btn.disabled = false;
+        btn.textContent = "Créer mon compte";
+      }
+    });
+  </script></Baselayout
+>

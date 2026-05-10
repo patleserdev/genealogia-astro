@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { ObjectId } from "mongodb";
-import { persons } from "../../../lib/mongo.ts";
+import { changeRequests, persons, relations, user_persons } from "../../../lib/mongo.ts";
 
 export const PATCH: APIRoute = async ({ params, request }) => {
     const id = params.id;
@@ -29,16 +29,37 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     return new Response(JSON.stringify({ success: true }), { status: 200 });
   };
   
-  export const DELETE: APIRoute = async ({ params }) => {
-    const id = params.id;
-  
-    if (!id) return new Response("ID manquant", { status: 400 });
-  
-    const result = await persons.deleteOne({ _id: new ObjectId(id) });
-  
-    if (result.deletedCount === 0) {
-      return new Response("Personne non trouvée", { status: 404 });
-    }
-  
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
-  };
+export const DELETE: APIRoute = async ({ params }) => {
+  const id = params.id;
+
+  if (!id) return new Response("ID manquant", { status: 400 });
+
+  const personObjectId = new ObjectId(id);
+
+  // 1. supprimer la personne
+  const result = await persons.deleteOne({ _id: personObjectId });
+
+  if (result.deletedCount === 0) {
+    return new Response("Personne non trouvée", { status: 404 });
+  }
+
+  // 2. supprimer les liens user-person
+  await user_persons.deleteMany({
+    personId: personObjectId,
+  });
+
+  // 3. supprimer les relations (dans les 2 sens)
+  await relations.deleteMany({
+    $or: [
+      { fromPersonId: personObjectId },
+      { toPersonId: personObjectId }
+    ]
+  });
+
+  // 4. optionnel mais recommandé : nettoyer les change requests liées
+  await changeRequests.deleteMany({
+    personId: personObjectId
+  });
+
+  return new Response(JSON.stringify({ success: true }), { status: 200 });
+};

@@ -1,177 +1,290 @@
 ---
 import Baselayout from "../layouts/Baselayout.astro";
-const registrationEnabled = import.meta.env.PUBLIC_REGISTRATION_ENABLED !== 'false'
+const registrationEnabled =
+  import.meta.env.PUBLIC_REGISTRATION_ENABLED !== "false";
 
+const token = Astro.url.searchParams.get("invite");
+console.log("TOKEN:", token);
+
+//if (!token) return Astro.redirect('/login')
 if (!registrationEnabled) return Astro.redirect('/login')
 ---
+
 <Baselayout title="S'inscrire">
   <div class="h-full bg-stone-50 flex overflow-hidden">
-
-    <!-- Colonne gauche : déco -->
-    <div class="hidden lg:flex lg:w-5/12 bg-amber-800 flex-col justify-between p-12 relative overflow-hidden">
-      <!-- Motif de fond -->
-      <div class="absolute inset-0 opacity-10">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="tree" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
-              <circle cx="30" cy="30" r="1.5" fill="white"/>
-              <line x1="30" y1="30" x2="30" y2="15" stroke="white" stroke-width="1"/>
-              <line x1="30" y1="22" x2="20" y2="14" stroke="white" stroke-width="0.8"/>
-              <line x1="30" y1="22" x2="40" y2="14" stroke="white" stroke-width="0.8"/>
-              <line x1="20" y1="14" x2="14" y2="8"  stroke="white" stroke-width="0.6"/>
-              <line x1="20" y1="14" x2="26" y2="8"  stroke="white" stroke-width="0.6"/>
-              <line x1="40" y1="14" x2="34" y2="8"  stroke="white" stroke-width="0.6"/>
-              <line x1="40" y1="14" x2="46" y2="8"  stroke="white" stroke-width="0.6"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#tree)"/>
-        </svg>
-      </div>
-
-      <!-- Logo / marque -->
-      <div class="relative z-10">
-        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/15 mb-6">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/>
-          </svg>
-        </div>
-        <h2 class="text-2xl font-semibold text-white tracking-tight">Arbre généalogique</h2>
-        <p class="text-amber-200 mt-2 text-sm leading-relaxed">
-          Retrouvez vos racines, préservez la mémoire de votre famille pour les générations futures.
-        </p>
-        <div class="object-contain my-2 p-3">
-          <img class="brightness-80" src="/family2.jpg"/>
-        </div>
-      </div>
-
-      <!-- Citation bas -->
-      <div class="relative z-10">
-        <div class="h-px bg-white/20 mb-6"></div>
-        <p class="text-amber-100 text-sm italic leading-relaxed">
-          "Un peuple sans histoire est comme un arbre sans racines."
-        </p>
-        <p class="text-amber-300 text-xs mt-2">— Marcus Garvey</p>
-      </div>
-    </div>
-
     <!-- Colonne droite : formulaire -->
     <div class="flex-1 flex flex-col overflow-hidden">
       <div class="flex-1 overflow-y-auto">
-        <div class="min-h-full flex items-center justify-center px-6 py-8">
+        <div class="min-h-full flex items-center justify-center px-6 py-4">
           <div class="w-full max-w-md">
-
             <!-- En-tête mobile uniquement -->
             <div class="lg:hidden text-center mb-6">
-              <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 mb-3">
-                <svg class="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/>
+              <div
+                class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 mb-3"
+              >
+                <svg
+                  class="w-5 h-5 text-amber-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.5"
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"
+                  ></path>
                 </svg>
               </div>
-              <h1 class="text-xl font-semibold text-stone-800">Créer un compte</h1>
+              <h1 class="text-xl font-semibold text-stone-800">
+                Créer un compte
+              </h1>
             </div>
 
             <!-- Titre desktop -->
             <div class="hidden lg:block mb-6">
-              <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">Créer un compte</h1>
-              <p class="text-sm text-stone-500 mt-1">Rejoignez votre arbre généalogique</p>
+              <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">
+                Créer un compte
+              </h1>
+              <p class="text-sm text-stone-500 mt-1">
+                Rejoignez votre arbre généalogique
+              </p>
             </div>
 
             <!-- Carte formulaire -->
-            <div class="bg-white rounded-2xl shadow-sm border border-stone-200 p-6">
+            <div
+              class="bg-white rounded-2xl shadow-sm border border-stone-200 p-6"
+            >
               <form id="signupForm" class="space-y-4">
-
                 <!-- Prénom + Nom -->
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-xs font-medium text-stone-700 mb-1">Prénom</label>
-                    <input type="text" name="prenom" required placeholder="Jean"
-                      class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+                    <label class="block text-xs font-medium text-stone-700 mb-1"
+                      >Prénom</label
+                    >
+                    <input
+                      type="text"
+                      name="prenom"
+                      required
+                      placeholder="Jean"
+                      class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-stone-700 mb-1">Nom</label>
-                    <input type="text" name="nom" required placeholder="Dupont"
-                      class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+                    <label class="block text-xs font-medium text-stone-700 mb-1"
+                      >Nom</label
+                    >
+                    <input
+                      type="text"
+                      name="nom"
+                      required
+                      placeholder="Dupont"
+                      class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                    />
                   </div>
                 </div>
 
                 <!-- Email + Date -->
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-xs font-medium text-stone-700 mb-1">Email</label>
-                    <input type="email" name="email" required placeholder="jean@exemple.fr"
-                      class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+                    <label class="block text-xs font-medium text-stone-700 mb-1"
+                      >Email</label
+                    >
+                    <input
+                      type="email"
+                      name="email"
+                      required
+                      placeholder="jean@exemple.fr"
+                      class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-stone-700 mb-1">Date de naissance</label>
-                    <input type="date" name="dateNaissance" required
-                      class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+                    <label class="block text-xs font-medium text-stone-700 mb-1"
+                      >Date de naissance</label
+                    >
+                    <input
+                      type="date"
+                      name="dateNaissance"
+                      required
+                      class="w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                    />
                   </div>
                 </div>
 
                 <!-- Mot de passe -->
                 <div>
-                  <label class="block text-xs font-medium text-stone-700 mb-1">Mot de passe</label>
+                  <label class="block text-xs font-medium text-stone-700 mb-1"
+                    >Mot de passe</label
+                  >
                   <div class="relative">
-                    <input type="password" name="password" id="password" required placeholder="••••••••"
-                      class="w-full px-3 py-2 pr-9 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
-                    <button type="button" id="togglePassword"
-                      class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition">
-                      <svg id="eyeIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    <input
+                      type="password"
+                      name="password"
+                      id="password"
+                      required
+                      placeholder="••••••••"
+                      class="w-full px-3 py-2 pr-9 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                    />
+                    <button
+                      type="button"
+                      id="togglePassword"
+                      class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition"
+                    >
+                      <svg
+                        id="eyeIcon"
+                        class="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        ></path>
                       </svg>
-                      <svg id="eyeOffIcon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                      <svg
+                        id="eyeOffIcon"
+                        class="w-4 h-4 hidden"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                        ></path>
                       </svg>
                     </button>
                   </div>
                   <!-- Règles + barre compactes -->
                   <div class="mt-2 flex gap-1">
-                    <div class="strength-bar h-1 flex-1 rounded-full bg-stone-100 transition-colors duration-300"></div>
-                    <div class="strength-bar h-1 flex-1 rounded-full bg-stone-100 transition-colors duration-300"></div>
-                    <div class="strength-bar h-1 flex-1 rounded-full bg-stone-100 transition-colors duration-300"></div>
-                    <div class="strength-bar h-1 flex-1 rounded-full bg-stone-100 transition-colors duration-300"></div>
+                    <div
+                      class="strength-bar h-1 flex-1 rounded-full bg-stone-100 transition-colors duration-300"
+                    >
+                    </div>
+                    <div
+                      class="strength-bar h-1 flex-1 rounded-full bg-stone-100 transition-colors duration-300"
+                    >
+                    </div>
+                    <div
+                      class="strength-bar h-1 flex-1 rounded-full bg-stone-100 transition-colors duration-300"
+                    >
+                    </div>
+                    <div
+                      class="strength-bar h-1 flex-1 rounded-full bg-stone-100 transition-colors duration-300"
+                    >
+                    </div>
                   </div>
-                  <div class="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1" id="passwordRules">
+                  <div
+                    class="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1"
+                    id="passwordRules"
+                  >
                     <div class="flex items-center gap-1.5" data-rule="length">
-                      <span class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"></span>
-                      <span class="rule-text text-xs text-stone-400">8 caractères min.</span>
+                      <span
+                        class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"
+                      ></span>
+                      <span class="rule-text text-xs text-stone-400"
+                        >8 caractères min.</span
+                      >
                     </div>
                     <div class="flex items-center gap-1.5" data-rule="upper">
-                      <span class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"></span>
-                      <span class="rule-text text-xs text-stone-400">Une majuscule</span>
+                      <span
+                        class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"
+                      ></span>
+                      <span class="rule-text text-xs text-stone-400"
+                        >Une majuscule</span
+                      >
                     </div>
                     <div class="flex items-center gap-1.5" data-rule="lower">
-                      <span class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"></span>
-                      <span class="rule-text text-xs text-stone-400">Une minuscule</span>
+                      <span
+                        class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"
+                      ></span>
+                      <span class="rule-text text-xs text-stone-400"
+                        >Une minuscule</span
+                      >
                     </div>
                     <div class="flex items-center gap-1.5" data-rule="number">
-                      <span class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"></span>
-                      <span class="rule-text text-xs text-stone-400">Un chiffre</span>
+                      <span
+                        class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"
+                      ></span>
+                      <span class="rule-text text-xs text-stone-400"
+                        >Un chiffre</span
+                      >
                     </div>
-                    <div class="flex items-center gap-1.5 col-span-2" data-rule="special">
-                      <span class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"></span>
-                      <span class="rule-text text-xs text-stone-400">Un caractère spécial</span>
+                    <div
+                      class="flex items-center gap-1.5 col-span-2"
+                      data-rule="special"
+                    >
+                      <span
+                        class="rule-dot w-1.5 h-1.5 rounded-full bg-stone-200 transition-colors duration-200 shrink-0"
+                      ></span>
+                      <span class="rule-text text-xs text-stone-400"
+                        >Un caractère spécial</span
+                      >
                     </div>
                   </div>
                 </div>
 
                 <!-- Confirmation -->
                 <div>
-                  <label class="block text-xs font-medium text-stone-700 mb-1">Confirmer le mot de passe</label>
+                  <label class="block text-xs font-medium text-stone-700 mb-1"
+                    >Confirmer le mot de passe</label
+                  >
                   <div class="relative">
-                    <input type="password" name="passwordConfirm" id="passwordConfirm" required placeholder="••••••••"
-                      class="w-full px-3 py-2 pr-9 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
-                    <button type="button" id="toggleConfirm"
-                      class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition">
-                      <svg id="eyeIconC" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    <input
+                      type="password"
+                      name="passwordConfirm"
+                      id="passwordConfirm"
+                      required
+                      placeholder="••••••••"
+                      class="w-full px-3 py-2 pr-9 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                    />
+                    <button
+                      type="button"
+                      id="toggleConfirm"
+                      class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition"
+                    >
+                      <svg
+                        id="eyeIconC"
+                        class="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        ></path>
                       </svg>
-                      <svg id="eyeOffIconC" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                      <svg
+                        id="eyeOffIconC"
+                        class="w-4 h-4 hidden"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                        ></path>
                       </svg>
                     </button>
                   </div>
@@ -189,187 +302,387 @@ if (!registrationEnabled) return Astro.redirect('/login')
                 <div class="relative">
                   <label class="block text-xs font-medium text-stone-700 mb-1">
                     Déjà dans l'arbre ?
-                    <span class="font-normal text-stone-400 ml-1">(optionnel)</span>
+                    <span class="font-normal text-stone-400 ml-1"
+                      >(optionnel)</span
+                    >
                   </label>
                   <div class="relative">
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+                    <svg
+                      class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+                      ></path>
                     </svg>
-                    <input type="text" id="searchPerson" autocomplete="off"
+                    <input
+                      type="text"
+                      id="searchPerson"
+                      autocomplete="off"
                       placeholder="Recherchez par prénom ou nom…"
-                      class="w-full pl-8 pr-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"/>
+                      class="w-full pl-8 pr-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                    />
                   </div>
-                  <ul id="searchResults"
-                    class="absolute z-10 mt-1 w-full bg-white border border-stone-200 rounded-xl shadow-md overflow-hidden empty:hidden"></ul>
+                  <ul
+                    id="searchResults"
+                    class="absolute z-10 mt-1 w-full bg-white border border-stone-200 rounded-xl shadow-md overflow-hidden empty:hidden"
+                  >
+                  </ul>
                   <input type="hidden" name="personId" id="personId" />
-                  <p id="selectedLabel" class="hidden mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5"></p>
+                  <p
+                    id="selectedLabel"
+                    class="hidden mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5"
+                  >
+                  </p>
                 </div>
 
                 <!-- Erreur -->
-                <p id="errorMsg" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></p>
+                <p
+                  id="errorMsg"
+                  class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+                >
+                </p>
 
                 <!-- Submit -->
-                <button type="submit" id="submitBtn"
-                  class="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150">
+                <button
+                  type="submit"
+                  id="submitBtn"
+                  class="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150"
+                >
                   Créer mon compte
                 </button>
               </form>
 
               <p class="text-center text-sm text-stone-500 mt-4">
                 Déjà un compte ?
-                <a href="/login" class="text-amber-700 hover:underline font-medium">Se connecter</a>
+                <a
+                  href="/login"
+                  class="text-amber-700 hover:underline font-medium"
+                  >Se connecter</a
+                >
               </p>
             </div>
-
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Colonne gauche : déco -->
+    <div
+      class="hidden h-full lg:flex lg:w-1/2 bg-amber-800 flex-col justify-between p-6 relative overflow-hidden"
+    >
+      <!-- Motif de fond -->
+      <div class="absolute inset-0 opacity-10">
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern
+              id="tree"
+              x="0"
+              y="0"
+              width="60"
+              height="60"
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx="30" cy="30" r="1.5" fill="white"></circle>
+              <line
+                x1="30"
+                y1="30"
+                x2="30"
+                y2="15"
+                stroke="white"
+                stroke-width="1"></line>
+              <line
+                x1="30"
+                y1="22"
+                x2="20"
+                y2="14"
+                stroke="white"
+                stroke-width="0.8"></line>
+              <line
+                x1="30"
+                y1="22"
+                x2="40"
+                y2="14"
+                stroke="white"
+                stroke-width="0.8"></line>
+              <line
+                x1="20"
+                y1="14"
+                x2="14"
+                y2="8"
+                stroke="white"
+                stroke-width="0.6"></line>
+              <line
+                x1="20"
+                y1="14"
+                x2="26"
+                y2="8"
+                stroke="white"
+                stroke-width="0.6"></line>
+              <line
+                x1="40"
+                y1="14"
+                x2="34"
+                y2="8"
+                stroke="white"
+                stroke-width="0.6"></line>
+              <line
+                x1="40"
+                y1="14"
+                x2="46"
+                y2="8"
+                stroke="white"
+                stroke-width="0.6"></line>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#tree)"></rect>
+        </svg>
+      </div>
+
+      <!-- Logo / marque -->
+      <div class="relative z-10">
+        <div
+          class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/15 mb-6"
+        >
+          <svg
+            class="w-6 h-6 text-white"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"
+            ></path>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-semibold text-white tracking-tight">
+          Arbre généalogique
+        </h2>
+        <p class="text-amber-200 mt-2 text-sm leading-relaxed">
+          Retrouvez vos racines, préservez la mémoire de votre famille pour les
+          générations futures.
+        </p>
+        <div class="object-contain my-2">
+          <img class="brightness-80 h-100" src="/family2.jpg" />
+        </div>
+      </div>
+
+      <!-- Citation bas -->
+      <div class="relative z-10">
+        <div class="h-px bg-white/20 mb-6"></div>
+        <p class="text-amber-100 text-sm italic leading-relaxed">
+          "Un peuple sans histoire est comme un arbre sans racines."
+        </p>
+        <p class="text-amber-300 text-xs mt-2">— Marcus Garvey</p>
+      </div>
+    </div>
   </div>
 </Baselayout>
 
 <script>
   // ── Règles ────────────────────────────────────────────────────────────
   const RULES: Record<string, RegExp | ((v: string) => boolean)> = {
-    length:  (v) => v.length >= 8,
-    upper:   /[A-Z]/,
-    lower:   /[a-z]/,
-    number:  /[0-9]/,
+    length: (v) => v.length >= 8,
+    upper: /[A-Z]/,
+    lower: /[a-z]/,
+    number: /[0-9]/,
     special: /[^A-Za-z0-9]/,
-  }
-  const checkRule  = (rule: string, v: string) => { const r = RULES[rule]; return typeof r === 'function' ? r(v) : r.test(v) }
-  const countPassed = (v: string) => Object.keys(RULES).filter(r => checkRule(r, v)).length
+  };
+  const checkRule = (rule: string, v: string) => {
+    const r = RULES[rule];
+    return typeof r === "function" ? r(v) : r.test(v);
+  };
+  const countPassed = (v: string) =>
+    Object.keys(RULES).filter((r) => checkRule(r, v)).length;
 
   // ── Toggle ────────────────────────────────────────────────────────────
-  function makeToggle(btnId: string, inputId: string, eyeId: string, eyeOffId: string) {
-    const btn = document.getElementById(btnId)!
-    const input = document.getElementById(inputId) as HTMLInputElement
-    const eye = document.getElementById(eyeId)!
-    const eyeOff = document.getElementById(eyeOffId)!
-    btn.addEventListener('click', () => {
-      const visible = input.type === 'text'
-      input.type = visible ? 'password' : 'text'
-      eye.classList.toggle('hidden', !visible)
-      eyeOff.classList.toggle('hidden', visible)
-    })
+  function makeToggle(
+    btnId: string,
+    inputId: string,
+    eyeId: string,
+    eyeOffId: string,
+  ) {
+    const btn = document.getElementById(btnId)!;
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const eye = document.getElementById(eyeId)!;
+    const eyeOff = document.getElementById(eyeOffId)!;
+    btn.addEventListener("click", () => {
+      const visible = input.type === "text";
+      input.type = visible ? "password" : "text";
+      eye.classList.toggle("hidden", !visible);
+      eyeOff.classList.toggle("hidden", visible);
+    });
   }
-  makeToggle('togglePassword', 'password',        'eyeIcon',  'eyeOffIcon')
-  makeToggle('toggleConfirm',  'passwordConfirm', 'eyeIconC', 'eyeOffIconC')
+  makeToggle("togglePassword", "password", "eyeIcon", "eyeOffIcon");
+  makeToggle("toggleConfirm", "passwordConfirm", "eyeIconC", "eyeOffIconC");
 
   // ── Force mot de passe ────────────────────────────────────────────────
-  const passwordInput = document.getElementById('password') as HTMLInputElement
-  const strengthBars  = document.querySelectorAll<HTMLElement>('.strength-bar')
+  const passwordInput = document.getElementById("password") as HTMLInputElement;
+  const strengthBars = document.querySelectorAll<HTMLElement>(".strength-bar");
   const STRENGTH_CONFIG = [
-    { label: '',           colors: [] },
-    { label: 'Très faible', colors: ['bg-red-400'] },
-    { label: 'Faible',      colors: ['bg-red-400', 'bg-red-300'] },
-    { label: 'Moyen',       colors: ['bg-amber-400', 'bg-amber-400', 'bg-amber-300'] },
-    { label: 'Fort',        colors: ['bg-green-400', 'bg-green-400', 'bg-green-400', 'bg-green-300'] },
-    { label: 'Très fort',   colors: ['bg-green-500', 'bg-green-500', 'bg-green-500', 'bg-green-500'] },
-  ]
+    { label: "", colors: [] },
+    { label: "Très faible", colors: ["bg-red-400"] },
+    { label: "Faible", colors: ["bg-red-400", "bg-red-300"] },
+    {
+      label: "Moyen",
+      colors: ["bg-amber-400", "bg-amber-400", "bg-amber-300"],
+    },
+    {
+      label: "Fort",
+      colors: ["bg-green-400", "bg-green-400", "bg-green-400", "bg-green-300"],
+    },
+    {
+      label: "Très fort",
+      colors: ["bg-green-500", "bg-green-500", "bg-green-500", "bg-green-500"],
+    },
+  ];
 
-  passwordInput.addEventListener('input', () => {
-    const val   = passwordInput.value
-    const score = countPassed(val)
-    document.querySelectorAll<HTMLElement>('#passwordRules [data-rule]').forEach(row => {
-      const passed = val.length > 0 && checkRule(row.dataset.rule!, val)
-      row.querySelector('.rule-dot')!.className = `rule-dot w-1.5 h-1.5 rounded-full transition-colors duration-200 shrink-0 ${passed ? 'bg-green-500' : 'bg-stone-200'}`
-      row.querySelector('.rule-text')!.className = `rule-text text-xs ${passed ? 'text-green-600' : 'text-stone-400'}`
-    })
-    const cfg = STRENGTH_CONFIG[val.length === 0 ? 0 : score] ?? STRENGTH_CONFIG[4]
+  passwordInput.addEventListener("input", () => {
+    const val = passwordInput.value;
+    const score = countPassed(val);
+    document
+      .querySelectorAll<HTMLElement>("#passwordRules [data-rule]")
+      .forEach((row) => {
+        const passed = val.length > 0 && checkRule(row.dataset.rule!, val);
+        row.querySelector(".rule-dot")!.className =
+          `rule-dot w-1.5 h-1.5 rounded-full transition-colors duration-200 shrink-0 ${passed ? "bg-green-500" : "bg-stone-200"}`;
+        row.querySelector(".rule-text")!.className =
+          `rule-text text-xs ${passed ? "text-green-600" : "text-stone-400"}`;
+      });
+    const cfg =
+      STRENGTH_CONFIG[val.length === 0 ? 0 : score] ?? STRENGTH_CONFIG[4];
     strengthBars.forEach((bar, i) => {
-      bar.className = `strength-bar h-1 flex-1 rounded-full transition-colors duration-300 ${cfg.colors[i] ?? 'bg-stone-100'}`
-    })
-    const confirmInput = document.getElementById('passwordConfirm') as HTMLInputElement
-    if (confirmInput.value) checkMatch()
-  })
+      bar.className = `strength-bar h-1 flex-1 rounded-full transition-colors duration-300 ${cfg.colors[i] ?? "bg-stone-100"}`;
+    });
+    const confirmInput = document.getElementById(
+      "passwordConfirm",
+    ) as HTMLInputElement;
+    if (confirmInput.value) checkMatch();
+  });
 
   // ── Correspondance ────────────────────────────────────────────────────
-  const confirmInput = document.getElementById('passwordConfirm') as HTMLInputElement
-  const matchMsg     = document.getElementById('matchMsg')!
+  const confirmInput = document.getElementById(
+    "passwordConfirm",
+  ) as HTMLInputElement;
+  const matchMsg = document.getElementById("matchMsg")!;
   function checkMatch() {
-    const match = passwordInput.value === confirmInput.value
-    matchMsg.classList.remove('hidden', 'text-green-600', 'text-red-500')
-    matchMsg.classList.add(match ? 'text-green-600' : 'text-red-500')
-    matchMsg.textContent = match ? '✓ Les mots de passe correspondent' : '✗ Ne correspondent pas'
+    const match = passwordInput.value === confirmInput.value;
+    matchMsg.classList.remove("hidden", "text-green-600", "text-red-500");
+    matchMsg.classList.add(match ? "text-green-600" : "text-red-500");
+    matchMsg.textContent = match
+      ? "✓ Les mots de passe correspondent"
+      : "✗ Ne correspondent pas";
   }
-  confirmInput.addEventListener('input', checkMatch)
+  confirmInput.addEventListener("input", checkMatch);
 
   // ── Recherche Person ──────────────────────────────────────────────────
-  const searchInput   = document.getElementById('searchPerson')  as HTMLInputElement
-  const resultsList   = document.getElementById('searchResults') as HTMLUListElement
-  const personIdInput = document.getElementById('personId')      as HTMLInputElement
-  const selectedLabel = document.getElementById('selectedLabel') as HTMLParagraphElement
-  let debounceTimer: ReturnType<typeof setTimeout>
+  const searchInput = document.getElementById(
+    "searchPerson",
+  ) as HTMLInputElement;
+  const resultsList = document.getElementById(
+    "searchResults",
+  ) as HTMLUListElement;
+  const personIdInput = document.getElementById("personId") as HTMLInputElement;
+  const selectedLabel = document.getElementById(
+    "selectedLabel",
+  ) as HTMLParagraphElement;
+  let debounceTimer: ReturnType<typeof setTimeout>;
 
-  searchInput.addEventListener('input', () => {
-    clearTimeout(debounceTimer)
-    const q = searchInput.value.trim()
-    if (q.length < 2) { resultsList.innerHTML = ''; return }
+  searchInput.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 2) {
+      resultsList.innerHTML = "";
+      return;
+    }
     debounceTimer = setTimeout(async () => {
-      const persons = await fetch(`/api/persons/search?q=${encodeURIComponent(q)}`).then(r => r.json())
+      const persons = await fetch(
+        `/api/persons/search?q=${encodeURIComponent(q)}`,
+      ).then((r) => r.json());
       resultsList.innerHTML = persons.length
-        ? persons.map((p: any) => `
+        ? persons
+            .map(
+              (p: any) => `
             <li data-id="${p._id}" class="px-4 py-2 text-sm text-stone-700 hover:bg-amber-50 cursor-pointer flex justify-between items-center">
               <span>${p.prenom} ${p.nom}</span>
-              ${p.dateNaissance ? `<span class="text-xs text-stone-400">${p.dateNaissance}</span>` : ''}
-            </li>`).join('')
-        : `<li class="px-4 py-2.5 text-sm text-stone-400 text-center">Aucun profil trouvé</li>`
-    }, 300)
-  })
+              ${p.dateNaissance ? `<span class="text-xs text-stone-400">${p.dateNaissance}</span>` : ""}
+            </li>`,
+            )
+            .join("")
+        : `<li class="px-4 py-2.5 text-sm text-stone-400 text-center">Aucun profil trouvé</li>`;
+    }, 300);
+  });
 
-  resultsList.addEventListener('click', (e) => {
-    const li = (e.target as HTMLElement).closest('li[data-id]') as HTMLLIElement | null
-    if (!li) return
-    personIdInput.value = li.dataset.id!
-    selectedLabel.textContent = `✓ Profil sélectionné : ${li.querySelector('span')?.textContent}`
-    selectedLabel.classList.remove('hidden')
-    resultsList.innerHTML = ''
-    searchInput.value = ''
-  })
+  resultsList.addEventListener("click", (e) => {
+    const li = (e.target as HTMLElement).closest(
+      "li[data-id]",
+    ) as HTMLLIElement | null;
+    if (!li) return;
+    personIdInput.value = li.dataset.id!;
+    selectedLabel.textContent = `✓ Profil sélectionné : ${li.querySelector("span")?.textContent}`;
+    selectedLabel.classList.remove("hidden");
+    resultsList.innerHTML = "";
+    searchInput.value = "";
+  });
 
-  document.addEventListener('click', (e) => {
-    if (!searchInput.contains(e.target as Node)) resultsList.innerHTML = ''
-  })
+  document.addEventListener("click", (e) => {
+    if (!searchInput.contains(e.target as Node)) resultsList.innerHTML = "";
+  });
 
   // ── Soumission ────────────────────────────────────────────────────────
-  document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const form      = e.target as HTMLFormElement
-    const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement
-    const errorMsg  = document.getElementById('errorMsg')  as HTMLParagraphElement
+  document
+    .getElementById("signupForm")
+    ?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target as HTMLFormElement;
+      const submitBtn = document.getElementById(
+        "submitBtn",
+      ) as HTMLButtonElement;
+      const errorMsg = document.getElementById(
+        "errorMsg",
+      ) as HTMLParagraphElement;
 
-    if (countPassed(passwordInput.value) < 5) {
-      errorMsg.textContent = 'Le mot de passe ne respecte pas les critères de sécurité.'
-      errorMsg.classList.remove('hidden'); return
-    }
-    if (passwordInput.value !== confirmInput.value) {
-      errorMsg.textContent = 'Les mots de passe ne correspondent pas.'
-      errorMsg.classList.remove('hidden'); return
-    }
+      if (countPassed(passwordInput.value) < 5) {
+        errorMsg.textContent =
+          "Le mot de passe ne respecte pas les critères de sécurité.";
+        errorMsg.classList.remove("hidden");
+        return;
+      }
+      if (passwordInput.value !== confirmInput.value) {
+        errorMsg.textContent = "Les mots de passe ne correspondent pas.";
+        errorMsg.classList.remove("hidden");
+        return;
+      }
 
-    const data = Object.fromEntries(new FormData(form))
-    delete (data as any).passwordConfirm
+      const data = Object.fromEntries(new FormData(form));
+      delete (data as any).passwordConfirm;
 
-    submitBtn.disabled = true
-    submitBtn.textContent = 'Création en cours…'
-    errorMsg.classList.add('hidden')
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Création en cours…";
+      errorMsg.classList.add("hidden");
 
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
-    if (res.ok) {
-      window.location.href = '/login'
-    } else {
-      const { error } = await res.json()
-      errorMsg.textContent = error ?? 'Une erreur est survenue'
-      errorMsg.classList.remove('hidden')
-      submitBtn.disabled = false
-      submitBtn.textContent = 'Créer mon compte'
-    }
-  })
+      if (res.ok) {
+        window.location.href = "/login";
+      } else {
+        const { error } = await res.json();
+        errorMsg.textContent = error ?? "Une erreur est survenue";
+        errorMsg.classList.remove("hidden");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Créer mon compte";
+      }
+    });
 </script>

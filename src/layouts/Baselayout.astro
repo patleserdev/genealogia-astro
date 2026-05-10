@@ -3,24 +3,61 @@
 const { title = "Arbre généalogique" } = Astro.props;
 import "../styles/global.css";
 import { verifyToken } from "../lib/auth";
+import { changeRequests, notifications } from "../lib/mongo";
+import { ObjectId } from "mongodb";
 
-let user = null;
 const token = Astro.cookies.get("token")?.value;
+let payload = null;
 if (token) {
   try {
-    user = verifyToken(token);
+    payload = verifyToken(token);
   } catch {}
+  // pas de redirect ici — c'est le rôle du middleware
+}
+
+const isOwner = payload?.role === "OWNER";
+
+let pendingModerationCount = 0;
+
+if (isOwner) {
+  pendingModerationCount = await changeRequests.countDocuments({
+    status: "PENDING",
+  });
 }
 
 const registrationEnabled = import.meta.env.DEMO_MODE !== "false";
+let unreadNotifications = 0;
+
+if (payload?.userId) {
+  unreadNotifications = await notifications.countDocuments({
+    userId: new ObjectId(payload.userId),
+    read: false,
+  });
+  console.log(unreadNotifications)
+}
 
 const nav = [
-  { href: "/", label: "Accueil" },
-  { href: "/persons", label: "Personnes" },
-  { href: "/relations", label: "Relations" },
-  { href: "/relations/add-quick", label: "Relation rapide" },
-  { href: "/persons/add-with-relations", label: "Personne + Relation" },
-];
+  { href: "/", label: "Accueil", ownerOnly: false },
+  { href: "/persons", label: "Personnes", ownerOnly: false },
+  { href: "/relations", label: "Relations", ownerOnly: false },
+  { href: "/invitations", label: "Invitations", ownerOnly: true },
+  {
+    href: "/moderation",
+    label: "Modération",
+    ownerOnly: false,
+    badge: isOwner ? pendingModerationCount:unreadNotifications,
+  },
+  { href: "/relations/add-quick", label: "Relation rapide", ownerOnly: true },
+  {
+    href: "/persons/add-with-relations",
+    label: "Personne + Relation",
+    ownerOnly: true,
+  },
+  { href: "/users", label: "Utilisateurs", ownerOnly: true },
+  { href: "/faq", label: "FAQ", ownerOnly: true },
+].filter((item) => !item.ownerOnly || isOwner);
+
+
 ---
 
 <!doctype html>
@@ -141,26 +178,75 @@ const nav = [
 
         <!-- Nav desktop -->
         <nav
-          id="desktopNav"
-          class="hidden lg:flex items-center gap-0.5 flex-1 px-4"
+        id="desktopNav"
+        class="hidden lg:flex flex-1 px-4 items-center justify-center"
         >
+        <div class="flex items-center gap-1 relative">
           {
-            nav.map(({ href, label }) => (
+          nav
+          .filter(i => !i.ownerOnly)
+          .map(({ href, label, badge }) => (
+          <a
+            href={href}
+            data-navlink
+            class="relative px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900 transition-colors"
+          >
+            <span class="relative z-10 flex items-center gap-1">
+              {label}
+
+              {badge != undefined && badge > 0 && (
+                <span class="ml-1 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                  {badge}
+                </span>
+              )}
+            </span>
+
+            <!-- underline animé -->
+            <span
+              class="nav-underline absolute left-1/2 -translate-x-1/2 -bottom-1 h-[2px] w-0 bg-stone-900 rounded-full transition-all duration-300"
+            ></span>
+          </a>
+        ))
+    }
+
+    <!-- ADMIN DROPDOWN -->
+    {isOwner && (
+      <div class="relative" x-data="{ open: false }">
+        <button
+          @click="open = !open"
+          class="px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900 transition-colors flex items-center gap-1"
+        >
+          Admin
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+
+        <div
+          x-show="open"
+          @click.outside="open = false"
+          class="absolute right-0 mt-2 w-48 bg-white border border-stone-200 rounded-xl shadow-lg py-1 z-50"
+        >
+          {nav
+            .filter(i => i.ownerOnly)
+            .map(i => (
               <a
-                href={href}
-                data-navlink
-                class="px-3 py-1.5 rounded-lg text-sm text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors whitespace-nowrap font-medium"
+                href={i.href}
+                class="block px-3 py-2 text-sm text-stone-600 hover:bg-stone-100"
               >
-                {label}
+                {i.label}
               </a>
-            ))
-          }
-        </nav>
+            ))}
+        </div>
+      </div>
+    )}
+  </div>
+</nav>
 
         <!-- Actions droite -->
         <div class="hidden lg:flex items-center gap-2 shrink-0">
           {
-            user ? (
+            payload ? (
               <div class="flex items-center gap-2">
                 <a
                   href="/profil"
@@ -182,7 +268,7 @@ const nav = [
                     </svg>
                   </div>
                   <span class="uppercase">
-                    {user.nom} {user.prenom.slice(0, 1)}
+                    {payload.nom} {payload.prenom.slice(0, 1)}
                   </span>
                 </a>
                 <a
@@ -205,7 +291,7 @@ const nav = [
                     href="/register"
                     class="px-3 py-1.5 rounded-lg text-sm bg-amber-600 hover:bg-amber-700 text-white transition-colors font-medium"
                   >
-                    S\'inscrire
+                    S'inscrire
                   </a>
                 )}
               </div>
@@ -233,73 +319,137 @@ const nav = [
     </header>
 
     <!-- Mobile menu -->
-    <div
-      id="mobileMenu"
-      class="hidden fixed top-14 left-0 right-0 z-40 bg-white border-b border-stone-200 px-4 py-3 space-y-0.5"
-    >
-      {
-        nav.map(({ href, label }) => (
+    <!-- Mobile menu -->
+<div
+  id="mobileMenu"
+  class="hidden fixed top-14 left-0 right-0 z-40 bg-white border-b border-stone-200 px-4 py-3"
+>
+  <!-- Navigation principale -->
+  <div class="space-y-0.5">
+    {
+      nav
+        .filter((i) => !i.ownerOnly)
+        .map(({ href, label, badge }) => (
           <a
             href={href}
             data-navlink
-            class="block px-3 py-2 rounded-lg text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 transition-colors font-medium"
+            class="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 transition-colors font-medium"
           >
-            {label}
+            <span>{label}</span>
+
+            {badge != undefined && badge > 0 && (
+              <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                {badge}
+              </span>
+            )}
           </a>
         ))
-      }
-      <div class="h-px bg-stone-100 my-2"></div>
-      {
-        user ? (
-          <>
-            <a
-              href="/profil"
-              class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100 transition-colors font-medium"
+    }
+  </div>
+
+  <!-- Bloc admin -->
+  {
+    isOwner && (
+      <div class="mt-3 pt-3 border-t border-stone-100">
+        <div x-data="{ open: false }">
+          <button
+            @click="open = !open"
+            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors"
+          >
+            <span>Administration</span>
+
+            <svg
+              class="w-4 h-4 transition-transform"
+              :class="{ 'rotate-180': open }"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <div class="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center">
-                <svg
-                  class="w-3 h-3 text-amber-700"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-              </div>
-              {user.nom} — Mon profil
-            </a>
-            <a
-              href="/api/auth/logout"
-              class="block px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors font-medium"
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+
+          <div x-show="open" x-transition class="mt-2 space-y-1">
+            {
+              nav
+                .filter((i) => i.ownerOnly)
+                .map(({ href, label }) => (
+                  <a
+                    href={href}
+                    class="block px-3 py-2 rounded-lg text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 transition-colors"
+                  >
+                    {label}
+                  </a>
+                ))
+            }
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  <!-- Compte -->
+  <div class="h-px bg-stone-100 my-3"></div>
+
+  {
+    payload ? (
+      <>
+        <a
+          href="/profil"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100 transition-colors font-medium"
+        >
+          <div class="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center">
+            <svg
+              class="w-3 h-3 text-amber-700"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              Déconnexion
-            </a>
-          </>
-        ) : (
-          <>
-            <a
-              href="/login"
-              class="block px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100 transition-colors font-medium"
-            >
-              Se connecter
-            </a>
-            {!registrationEnabled && (
-              <a
-                href="/register"
-                class="px-3 py-1.5 rounded-lg text-sm bg-amber-600 hover:bg-amber-700 text-white transition-colors font-medium"
-              >
-                S\'inscrire
-              </a>
-            )}
-          </>
-        )
-      }
-    </div>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
+          </div>
+
+          {payload.nom} — Mon profil
+        </a>
+
+        <a
+          href="/api/auth/logout"
+          class="block px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors font-medium"
+        >
+          Déconnexion
+        </a>
+      </>
+    ) : (
+      <div class="space-y-1">
+        <a
+          href="/login"
+          class="block px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100 transition-colors font-medium"
+        >
+          Se connecter
+        </a>
+
+        {!registrationEnabled && (
+          <a
+            href="/register"
+            class="block px-3 py-2 rounded-lg text-sm bg-amber-600 hover:bg-amber-700 text-white transition-colors font-medium text-center"
+          >
+            S'inscrire
+          </a>
+        )}
+      </div>
+    )
+  }
+</div>
 
     <!-- MAIN -->
     <main class="flex-1" transition:name="main-content">
@@ -360,10 +510,10 @@ const nav = [
         // Liens actifs
         const path = window.location.pathname;
         document.querySelectorAll("[data-navlink]").forEach((a) => {
-          a.classList.remove("text-stone-800", "bg-stone-100");
+          a.classList.remove("text-stone-800");
           a.classList.add("text-stone-500");
           if (a.getAttribute("href") === path) {
-            a.classList.add("text-stone-800", "bg-stone-100");
+            a.classList.add("text-stone-800");
             a.classList.remove("text-stone-500");
           }
         });
@@ -398,13 +548,13 @@ const nav = [
       document.addEventListener("DOMContentLoaded", () => {
         initScrollbar();
         initMenu();
-        initBackToTop()
+        initBackToTop();
       });
 
       document.addEventListener("astro:page-load", () => {
         initScrollbar();
         initMenu();
-        initBackToTop()
+        initBackToTop();
       });
     </script>
 

@@ -23,7 +23,7 @@ export const GET: APIRoute = async ({ cookies }) => {
     : null
 
   return new Response(JSON.stringify({
-    user:   { email: user.email, prenom: user.prenom, nom: user.nom },
+    user:   { email: user.email, prenom: user.prenom, nom: user.nom , role: user.role,},
     person: person ?? null,
   }))
 }

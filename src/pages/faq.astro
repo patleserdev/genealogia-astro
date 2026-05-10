@@ -1,0 +1,115 @@
+---
+import Baselayout from "../layouts/Baselayout.astro";
+
+const modules = [
+    {
+        title: "Site",
+        childs: [
+           {"status":"ok",title:"Inscription"} ,
+           {"status":"ok",title:"Connexion"} ,
+           {"status":"ok",title:"Mot de passe oublié"} ,
+           {"status":"ko",title:"Envoi du mail de réinitialisation de mot de passe oublié"} ,
+           {"status":"ok",title:"Regénération de mot de passe"} ,
+           {"status":"ko",title:"Envoi du mail de confirmation de regénération de mot de passe"}
+        ],
+    },
+    {
+        title: "Personnes",
+        childs: [
+        {"status":"ok",title:"Liste des personnes"} ,
+        {"status":"ok",title:"Filtrage de la vue liste"} ,
+        {"status":"ok",title:"Création d'une personne"} ,
+        {"status":"ok",title:"Modification d'une personne"} ,
+        {"status":"ok",title:"Suppression d'une personne"} ,
+        {"status":"ok",title:"Vue personne"} ,
+        {"status":"ok",title:"Vue personne - timeline"} ,
+        {"status":"ok",title:"Vue arbre personne"} ,
+        ],
+    },
+    {
+        title: "Relations",
+        childs: [
+        {"status":"ok",title:"Liste des relations"},
+        {"status":"ok",title:"Filtrage de la vue liste"},
+        {"status":"ok",title:"Création d'une relation rapide"},
+        {"status":"ok",title:"Création d'une personne et ses relations"},
+        {"status":"ok",title:"Modification d'une relation"},
+        {"status":"ok",title:"Suppression d'une relation"},
+        {"status":"ok",title:"Vue des relations dans la vue personne"},
+        {"status":"ok",title:"Vue des relations dans la vue arbre personne"},
+        ],
+    },
+    {
+        title: "Invitations",
+        childs: [
+        {"status":"ok",title:"Liste des invitations"},
+        {"status":"ok",title:"Création d'une invitation"},
+        {"status":"ok",title:"Suppression d'une invitation"},
+        {"status":"ko",title:"Notifier par mail lors de suppression d'une invitation"},
+        {"status":"ko",title:"Envoi d'un mail d'invitation"},
+        {"status":"ok",title:"Partage complet/partiel des personnes du owner avec l'invitation"},
+        {"status":"ok",title:"Validation du token d'invitation"},
+        ],
+    },
+    {
+        title: "Modérations",
+        childs: [
+        {"status":"ok",title:"Liste des modérations"},
+        {"status":"ok",title:"Filtrage Owner / Guest"},
+        {"status":"ok",title:"Proposer une personne > modération"},
+        {"status":"ok",title:"Proposer une modification dans une fiche personne partagée"},
+        {"status":"ko",title:"Proposer une relation > modération"},
+        {"status":"ko",title:"Proposer une modification dans une fiche relation partagée"},
+        ],
+    },
+    {
+        title: "Utilisateurs",
+        childs: [
+        {"status":"ok",title:"Liste des utilisateurs"},
+        {"status":"ok",title:"Filtrage Owner / Guest"},
+        {"status":"ok",title:"Vue utilisateur"} ,
+        {"status":"ok",title:"Vue utilisateur - affichage des demandes de modération"} ,
+        {"status":"ok",title:"Vue utilisateur - demande réinitialisation de mot de passe"} ,
+        ],
+    },
+    {
+        title: "Notifications",
+        childs: [
+        {"status":"ok",title:"Notification user lors d'un retour de modération"},
+        {"status":"ko",title:"globaliser les notifications"},
+
+        ],
+    },
+];
+---
+
+<Baselayout title="Faq">
+    <div class="max-w-4xl mx-auto px-6 py-8 space-y-6">
+        <h1 class="font-bold text-xl">Fonctionnalités</h1>
+        <ul class="space-y-4">
+            {
+                modules.map((module) => (
+                    <li>
+                        <h2 class="font-bold text-lg">{module.title}</h2>
+
+                        <ul class="ml-6 mt-2 list-disc space-y-1">
+                            {module.childs.map((child) => (
+                                <li>{child.title}    <span
+      class={`inline-flex items-center justify-center min-w-6 h-6 px-2 text-xs font-medium rounded-full border uppercase
+      ${
+        child.status === "ok"
+          ? "bg-green-50 border-green-200 text-green-600"
+          : "bg-red-50 border-red-200 text-red-600"
+      }`}
+    >
+      {child.status}
+    </span></li>
+                            ))}
+                        </ul>
+                    </li>
+                ))
+            }
+        </ul>
+
+    </div>
+</Baselayout>

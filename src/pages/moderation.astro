@@ -1,0 +1,358 @@
+---
+// src/pages/moderation.astro
+
+import Baselayout from "../layouts/Baselayout.astro";
+import { verifyToken } from "../lib/auth.ts";
+import { changeRequests, notifications, persons } from "../lib/mongo";
+import { ObjectId } from "mongodb";
+
+const token = Astro.cookies.get('token')?.value
+if (!token) return Astro.redirect('/login')
+
+let payload: any
+try {
+  payload = verifyToken(token)
+} catch {
+  return Astro.redirect('/login')
+}
+
+
+const userId = new ObjectId(payload.userId)
+
+// rawOwner (si tu es owner)
+const rawOwner = await changeRequests.aggregate([
+  { $match: { ownerId: userId } },
+  { $sort: { createdAt: -1 } },
+  {
+  $lookup: {
+    from: 'users',
+    localField: 'requestedByUserId',
+    foreignField: '_id',
+    as: 'requester'
+  }
+},
+{
+  $lookup: {
+    from: 'persons',
+    localField: 'personId',
+    foreignField: '_id',
+    as: 'targetPerson'
+  }
+}
+]).toArray()
+
+// rawMine (tes demandes)
+const rawMine = await changeRequests.aggregate([
+  { $match: { requestedByUserId: userId } }, // ← aussi en ObjectId
+  { $sort: { createdAt: -1 } },
+  { $lookup: { from: 'users',   localField: 'ownerId',   foreignField: '_id', as: 'ownerUser' } },
+  { $lookup: { from: 'persons', localField: 'personId',  foreignField: '_id', as: 'targetPerson' } },
+]).toArray()
+console.log("payload.userId", payload.userId)
+console.log("rawOwner", rawOwner.length)
+console.log("rawMine", rawMine.length)
+
+const isOwner  = rawOwner.length > 0
+const isGuest  = rawMine.length  > 0
+
+const one = await changeRequests.findOne({})
+console.log("TYPE requestedByUserId:", typeof one?.requestedByUserId)
+console.log("VALUE:", one?.requestedByUserId)
+console.log("instanceof ObjectId:", one?.requestedByUserId instanceof ObjectId)
+
+function mapRequest(r: any) {
+  return {
+    _id:          r._id.toString(),
+    type:         r.type as 'ADD' | 'EDIT',
+    status:       r.status as 'PENDING' | 'ACCEPTED' | 'REJECTED',
+    proposedData: r.proposedData ?? {},
+    currentData:  r.targetPerson?.[0] ?? null,
+    reviewNote:   r.reviewNote ?? null,
+    createdAt:    new Date(r.createdAt).toLocaleDateString('fr-FR'),
+    requester:    r.requester?.[0] ? `${r.requester[0].prenom} ${r.requester[0].nom}` : 'Inconnu',
+    ownerName:    r.ownerUser?.[0]  ? `${r.ownerUser[0].prenom} ${r.ownerUser[0].nom}` : 'Inconnu',
+  }
+}
+
+const ownerRequests = rawOwner.map(mapRequest)
+const myRequests    = rawMine.map(mapRequest)
+
+const pending  = ownerRequests.filter(r => r.status === 'PENDING')
+const reviewed = ownerRequests.filter(r => r.status !== 'PENDING')
+
+const fields = ['prenom', 'nom', 'email', 'sexe', 'dateNaissance', 'dateDeces', 'notes'] as const
+const fieldLabel: Record<string, string> = {
+  prenom: 'Prénom', nom: 'Nom', email: 'Email', sexe: 'Sexe',
+  dateNaissance: 'Date de naissance', dateDeces: 'Date de décès', notes: 'Notes',
+}
+
+if (payload?.userId) {
+  await notifications.updateMany(
+    {
+      userId: new ObjectId(payload.userId),
+      read: false,
+      type: "CHANGE_REQUEST", // important : filtre métier
+    },
+    {
+      $set: { read: true },
+    }
+  );
+}
+---
+
+<Baselayout title="Modération">
+  <div class="max-w-4xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- En-tête -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">Modération</h1>
+        <p class="text-sm text-stone-500 mt-0.5">
+          {pending.length} demande{pending.length > 1 ? 's' : ''} en attente
+        </p>
+      </div>
+    </div>
+
+    <!-- Demandes en attente -->
+    {pending.length === 0 ? (
+      <div class="text-center py-16 border border-dashed border-stone-200 rounded-xl">
+        <div class="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <p class="text-sm text-stone-400">Aucune demande en attente</p>
+      </div>
+    ) : (
+      <div class="space-y-4">
+        <h2 class="text-sm font-medium text-stone-500 uppercase tracking-wide">En attente</h2>
+        {pending.map(r => (
+          <div class="bg-white border border-stone-200 rounded-xl overflow-hidden hover:border-stone-300 hover:shadow-sm transition">
+
+            <!-- Header carte -->
+            <div class="flex items-center justify-between px-5 py-3 border-b border-stone-100">
+              <div class="flex items-center gap-2">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${
+                  r.type === 'ADD'
+                    ? 'bg-violet-50 text-violet-700 border-violet-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {r.type === 'ADD' ? '+ Ajout' : '✏ Modification'}
+                </span>
+                <span class="text-sm text-stone-500">
+                  par <span class="font-medium text-stone-700 capitalize">{r.requester}</span>
+                </span>
+                <span class="text-xs text-stone-400">· {r.createdAt}</span>
+              </div>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                En attente
+              </span>
+            </div>
+
+            <!-- Diff -->
+            <div class="px-5 py-4">
+              {r.type === 'EDIT' && r.currentData ? (
+                <!-- Tableau diff avant/après -->
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th class="text-left text-xs font-medium text-stone-400 pb-2 w-1/4">Champ</th>
+                        <th class="text-left text-xs font-medium text-stone-400 pb-2 w-[37.5%]">Actuel</th>
+                        <th class="text-left text-xs font-medium text-stone-400 pb-2 w-[37.5%]">Proposé</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-50">
+                      {fields.map(f => {
+                        const current  = (r.currentData as any)?.[f] ?? '—'
+                        const proposed = (r.proposedData as any)?.[f] ?? '—'
+                        const changed  = current !== proposed
+                        return (
+                          <tr class={changed ? 'bg-amber-50/50' : ''}>
+                            <td class="py-1.5 pr-4 text-xs text-stone-400 font-medium">{fieldLabel[f]}</td>
+                            <td class={`py-1.5 pr-4 ${changed ? 'text-stone-400 line-through' : 'text-stone-600'}`}>
+                              {current}
+                            </td>
+                            <td class={`py-1.5 ${changed ? 'text-stone-800 font-medium' : 'text-stone-600'}`}>
+                              {proposed}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <!-- Ajout : liste des champs proposés -->
+                <div class="grid grid-cols-2 gap-x-6 gap-y-1">
+                  {fields.map(f => {
+                    const val = (r.proposedData as any)?.[f]
+                    if (!val) return null
+                    return (
+                      <div class="flex gap-2 py-1 text-sm">
+                        <span class="text-stone-400 w-32 shrink-0">{fieldLabel[f]}</span>
+                        <span class="text-stone-800 font-medium capitalize">{val}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <!-- Motif du guest -->
+              {r.reviewNote && (
+                <div class="mt-3 pt-3 border-t border-stone-100 flex gap-2 text-sm text-stone-500 italic">
+                  <svg class="w-4 h-4 mt-0.5 shrink-0 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                  </svg>
+                  <span>"{r.reviewNote}"</span>
+                </div>
+              )}
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-stone-100 bg-stone-50/50">
+              <!-- Champ note de refus -->
+              <input
+                type="text"
+                id={`note-${r._id}`}
+                placeholder="Motif du refus (optionnel)"
+                class="flex-1 px-3 py-1.5 rounded-lg border border-stone-200 text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-300 transition"
+              />
+              <button
+                class="btn-reject px-3 py-1.5 rounded-lg border border-stone-200 text-sm text-stone-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors font-medium"
+                data-id={r._id}
+              >
+                Refuser
+              </button>
+              <button
+                class="btn-accept px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+                data-id={r._id}
+              >
+                Accepter
+              </button>
+            </div>
+
+          </div>
+        ))}
+      </div>
+    )}
+
+    <!-- Historique -->
+    {reviewed.length > 0 && (
+      <div class="space-y-3">
+        <h2 class="text-sm font-medium text-stone-500 uppercase tracking-wide">Historique</h2>
+        {reviewed.map(r => (
+          <div class="bg-white border border-stone-200 rounded-xl px-5 py-3 flex items-center justify-between gap-3 opacity-70">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border shrink-0 ${
+                r.type === 'ADD'
+                  ? 'bg-violet-50 text-violet-700 border-violet-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                {r.type === 'ADD' ? '+ Ajout' : '✏ Modif'}
+              </span>
+              <span class="text-sm text-stone-600 truncate">
+                {(r.proposedData as any)?.prenom} {(r.proposedData as any)?.nom}
+              </span>
+              <span class="text-xs text-stone-400 shrink-0">par {r.requester} · {r.createdAt}</span>
+            </div>
+            <span class={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border shrink-0 ${
+              r.status === 'ACCEPTED'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-red-50 text-red-600 border-red-200'
+            }`}>
+              {r.status === 'ACCEPTED' ? 'Acceptée' : 'Refusée'}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+
+    <!-- Mes demandes -->
+{myRequests.length > 0 && (
+  <div class="space-y-3">
+    <h2 class="text-sm font-medium text-stone-500 uppercase tracking-wide">
+      Mes demandes
+    </h2>
+
+    {myRequests.map(r => (
+      <div class="bg-white border border-stone-200 rounded-xl px-5 py-3 flex items-center justify-between gap-3">
+
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span class={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${
+              r.type === 'ADD'
+                ? 'bg-violet-50 text-violet-700 border-violet-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              {r.type === 'ADD' ? '+ Ajout' : '✏ Modification'}
+            </span>
+
+            <span class="text-sm text-stone-700">
+              {(r.proposedData as any)?.prenom} {(r.proposedData as any)?.nom}
+            </span>
+          </div>
+
+          <p class="text-xs text-stone-400 mt-1">
+            Envoyée le {r.createdAt}
+          </p>
+
+          {r.reviewNote && (
+            <p class="text-xs text-stone-500 italic mt-1">
+              Motif : {r.reviewNote}
+            </p>
+          )}
+        </div>
+
+        <span class={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border shrink-0 ${
+          r.status === 'PENDING'
+            ? 'bg-amber-50 text-amber-700 border-amber-200'
+            : r.status === 'ACCEPTED'
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : 'bg-red-50 text-red-700 border-red-200'
+        }`}>
+          {
+            r.status === 'PENDING'
+              ? 'En attente'
+              : r.status === 'ACCEPTED'
+              ? 'Acceptée'
+              : 'Refusée'
+          }
+        </span>
+
+      </div>
+    ))}
+  </div>
+)}
+
+  </div>
+</Baselayout>
+
+<script>
+  async function review(id: string, decision: 'ACCEPTED' | 'REJECTED') {
+    const noteInput = document.getElementById(`note-${id}`) as HTMLInputElement
+    const reviewNote = noteInput?.value?.trim() || undefined
+
+    const res = await fetch('/api/change-requests/review', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ changeRequestId: id, decision, reviewNote }),
+    })
+
+    if (res.ok) {
+      window.location.reload()
+    } else {
+      const data = await res.json()
+      alert(data.error ?? 'Une erreur est survenue')
+    }
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.btn-accept').forEach(btn => {
+    btn.addEventListener('click', () => review(btn.dataset.id!, 'ACCEPTED'))
+  })
+
+  document.querySelectorAll<HTMLButtonElement>('.btn-reject').forEach(btn => {
+    btn.addEventListener('click', () => review(btn.dataset.id!, 'REJECTED'))
+  })
+</script>

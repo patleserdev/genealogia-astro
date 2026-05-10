@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { ObjectId } from "mongodb";
 import { db } from "../../../lib/mongo.ts";
+import { deleteRelation } from "../relations.ts";
 
 export const GET: APIRoute = async ({ params }) => {
   const personId = new ObjectId(params.id);
@@ -67,4 +68,31 @@ export const GET: APIRoute = async ({ params }) => {
   return new Response(JSON.stringify({ parents, enfants, conjoints }), {
     headers: { 'Content-Type': 'application/json' }
   });
+};
+
+/**
+ * DELETE /api/relations/:id
+ */
+
+export const DELETE: APIRoute = async ({ params }) => {
+  try {
+    await deleteRelation(params.id!);
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      { status: 200 }
+    );
+
+  } catch (err: any) {
+
+    if (err.message === "INVALID_ID") {
+      return new Response("ID invalide", { status: 400 });
+    }
+
+    if (err.message === "NOT_FOUND") {
+      return new Response("Introuvable", { status: 404 });
+    }
+
+    return new Response("Erreur serveur", { status: 500 });
+  }
 };

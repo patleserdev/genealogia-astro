@@ -3,15 +3,15 @@ import { ObjectId } from "mongodb";
 import DeleteButton from "../components/DeleteButton.astro";
 import Baselayout from "../layouts/Baselayout.astro";
 import { verifyToken } from "../lib/auth.ts";
-import { db, persons } from "../lib/mongo";
+import { persons, user_persons } from "../lib/mongo";
 import { formatDateFR } from "../utils/formatDate";
 
 const token = Astro.cookies.get('token')?.value
 if (!token) return Astro.redirect('/login')
 
+let payload
 try {
-  const payload = verifyToken(token)
-  await db.collection('users').findOne({ _id: new ObjectId(payload.userId) })
+  payload = verifyToken(token)
 } catch {
   return Astro.redirect('/login')
 }
@@ -39,10 +39,25 @@ function getGeneration(year: number): { label: string; color: string } | null {
   return           { label: "Génération Beta",         color: "bg-pink-50 text-pink-700"    };
 }
 
-const now  = new Date();
-const data = await persons.find({ active: true }).toArray();
+    const now  = new Date();
+    const userId=new ObjectId(payload.userId)
+    const links = await user_persons
+    .find({ userId :userId })
+    .project({ personId: 1, role: 1 })
+    .toArray();
 
-const personsList = data
+    const personIds = links.map(link => link.personId);
+    const roleMap = new Map(
+      links.map(link => [link.personId.toString(), link.role])
+    );
+    const data = await persons.find({
+      active: true,
+      _id: { $in: personIds }
+    }).toArray();
+    const isOwner = payload.role === 'OWNER'
+
+    const personsList = data
+
   .map((p) => {
     const dob = p.dateNaissance ? new Date(p.dateNaissance) : null;
     const dod = p.dateDeces     ? new Date(p.dateDeces)     : null;
@@ -57,6 +72,8 @@ const personsList = data
       ageDeces:     dob && dod ? ageLabel(calcAge(dob, dod))  : null,
       ageAujourdhui: dob       ? ageLabel(calcAge(dob, now))  : null,
       anneesDeces:  dod ? dod.getFullYear() : null,
+      role: roleMap.get(p._id.toString()), 
+
     };
   })
   .sort((a, b) => {
@@ -64,6 +81,9 @@ const personsList = data
     if (!b.dateNaissance) return -1;
     return new Date(a.dateNaissance).getTime() - new Date(b.dateNaissance).getTime();
   });
+
+  const proposed = Astro.url.searchParams.get('proposed')
+
 ---
 
 <Baselayout title="Personnes">
@@ -71,11 +91,22 @@ const personsList = data
 
     <!-- En-tête -->
     <div class="sticky top-14 z-10 bg-stone-50 pb-4 space-y-4">
+      <!-- Juste après l'en-tête sticky, avant la liste -->
+      {proposed && (
+        <div class="flex gap-3 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-700">
+          <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          <span>Votre proposition a été envoyée. Elle sera visible après validation.</span>
+        </div>
+      )}
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-semibold text-stone-800 tracking-tight">Personnes</h1>
         <p class="text-sm text-stone-500 mt-0.5">{personsList.length} personne{personsList.length > 1 ? 's' : ''} dans la liste</p>
       </div>
+   <!-- En-tête : remplacer le bouton Ajouter -->
+    {isOwner ? (
       <a href="/persons/add-with-relations"
         class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,6 +114,15 @@ const personsList = data
         </svg>
         Ajouter
       </a>
+    ) : (
+      <a href="/change-requests/new-person"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Proposer une personne
+      </a>
+)}
     </div>
 
     <!-- Barre recherche + tri -->
@@ -109,81 +149,197 @@ const personsList = data
     <!-- Liste -->
     <div id="persons-list" class="space-y-2">
       {personsList.map((p) => (
-       <div
-  class="person-card bg-white border border-stone-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:border-stone-300 hover:shadow-sm transition group"
+      <div
+  class="person-card relative bg-white border border-stone-200 rounded-2xl p-4 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-stone-300 hover:shadow-sm transition group"
   data-nom={p.nom.toLowerCase()}
   data-prenom={p.prenom.toLowerCase()}
 >
-  <!-- Infos -->
-  <div class="flex items-center gap-3 min-w-0 flex-1">
+  <!-- Badge rôle -->
+  <div class="absolute top-3 right-3 sm:static sm:ml-3">
+    <span
+      class={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium ${
+        p.role === "owner"
+          ? "bg-amber-100 text-amber-700"
+          : p.role === "editor"
+            ? "bg-blue-100 text-blue-700"
+            : "bg-stone-100 text-stone-600"
+      }`}
+    >
+      {p.role}
+    </span>
+  </div>
 
+  <!-- Bloc gauche -->
+  <div class="flex items-start gap-3 min-w-0 flex-1">
     <!-- Avatar -->
-    <div class={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border ${
-      p.dateDeces ? 'bg-stone-100 border-stone-200' : 'bg-amber-50 border-amber-100'
-    }`}>
-      <span class={`text-sm font-medium ${p.dateDeces ? 'text-stone-400' : 'text-amber-700'}`}>
-        {p.prenom.charAt(0).toUpperCase()}{p.nom.charAt(0).toUpperCase()}
+    <div
+      class={`w-12 h-12 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 border ${
+        p.dateDeces
+          ? "bg-stone-100 border-stone-200"
+          : "bg-amber-50 border-amber-100"
+      }`}
+    >
+      <span
+        class={`text-base sm:text-sm font-medium ${
+          p.dateDeces ? "text-stone-400" : "text-amber-700"
+        }`}
+      >
+        {p.prenom.charAt(0).toUpperCase()}
+        {p.nom.charAt(0).toUpperCase()}
       </span>
     </div>
 
-    <!-- Texte -->
+    <!-- Contenu -->
     <div class="min-w-0 flex-1">
-
-      <!-- Nom + génération -->
-      <div class="flex flex-col items-start md:flex-row md:items-center gap-2 flex-wrap">
-        <p class="text-lg md:text-sm font-medium text-stone-800 capitalize truncate">
+      <!-- Nom -->
+      <div class="pr-16 sm:pr-0">
+        <p class="text-base sm:text-sm font-semibold text-stone-800 capitalize leading-tight">
           {p.prenom} {p.nom}
         </p>
+
         {p.generation && (
-          <span class={`inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-medium shrink-0 ${p.generation.color}`}>
+          <span
+            class={`inline-flex items-center mt-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${p.generation.color}`}
+          >
             {p.generation.label}
           </span>
         )}
       </div>
 
-      <!-- Métadonnées -->
-      <div class="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-sm md:text-xs text-stone-400">
-        {p.dateNaissance && <span class="shrink-0">Né(e) le {formatDateFR(p.dateNaissance)}</span>}
-        {p.dateDeces
-          ? <span class="shrink-0">† {p.anneesDeces} · {p.ageDeces} · aurait {p.ageAujourdhui}</span>
-          : p.ageAujourdhui && <span class="shrink-0">{p.ageAujourdhui}</span>
-        }
-        {p.email && !p.dateDeces && <span class="truncate max-w-[180px] sm:max-w-none">{p.email}</span>}
-      </div>
+      <!-- Infos -->
+      <div class="mt-3 space-y-1.5 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1 text-sm sm:text-xs text-stone-500">
+        {p.dateNaissance && (
+          <div>
+            <span class="text-stone-400">Naissance :</span>{" "}
+            {formatDateFR(p.dateNaissance)}
+          </div>
+        )}
 
+        {p.dateDeces ? (
+          <div>
+            <span class="text-stone-400">Décès :</span> {p.anneesDeces}
+            {" · "}
+            {p.ageDeces}
+          </div>
+        ) : (
+          p.ageAujourdhui && (
+            <div>
+              <span class="text-stone-400">Âge :</span>{" "}
+              {p.ageAujourdhui}
+            </div>
+          )
+        )}
+
+        {p.email && !p.dateDeces && (
+          <div class="truncate">
+            <span class="text-stone-400">Email :</span> {p.email}
+          </div>
+        )}
+      </div>
     </div>
   </div>
 
   <!-- Actions -->
-  <div class="flex justify-end items-center gap-1 shrink-0 sm:ml-4 sm:opacity-60 sm:group-hover:opacity-100 sm:transition-opacity border-t border-stone-100 pt-2 sm:border-0 sm:pt-0">
-    <a href={`/persons/${p._id}`}
-      class="p-2 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
-      title="Voir">
-      <svg class="w-6 h-6 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+  <div class="flex items-center justify-end gap-1 pt-3 border-t border-stone-100 sm:border-0 sm:pt-0 shrink-0">
+    <a
+      href={`/persons/${p._id}`}
+      class="p-2.5 sm:p-2 rounded-xl text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
+      title="Voir"
+    >
+      <svg
+        class="w-5 h-5 sm:w-4 sm:h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+        />
       </svg>
     </a>
-    <a href={`/tree/${p._id}`}
-      class="p-2 rounded-lg text-stone-500 hover:text-amber-700 hover:bg-amber-50 transition-colors"
-      title="Vue arbre">
-      <svg class="w-6 h-6 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h6M3 12h6M3 17h6M13 7l4 5-4 5M17 12H21"/>
+
+    <a
+      href={`/tree/${p._id}`}
+      class="p-2.5 sm:p-2 rounded-xl text-stone-500 hover:text-amber-700 hover:bg-amber-50 transition-colors"
+      title="Vue arbre"
+    >
+      <svg
+        class="w-5 h-5 sm:w-4 sm:h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M3 7h6M3 12h6M3 17h6M13 7l4 5-4 5M17 12H21"
+        />
       </svg>
     </a>
-    <a href={`/persons/new?id=${p._id}`}
-      class="p-2 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
-      title="Modifier">
-      <svg class="w-6 h-6 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-1.414a2 2 0 01.586-1.414z"/>
-      </svg>
-    </a>
-    <div class="p-2 rounded-lg text-stone-500 hover:text-red-500 hover:bg-red-50 transition-colors" title="Supprimer">
-      <DeleteButton type="person" id={p._id} />
-    </div>
+
+    {isOwner ? (
+      <>
+        <a
+          href={`/persons/new?id=${p._id}`}
+          class="p-2.5 sm:p-2 rounded-xl text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
+          title="Modifier"
+        >
+          <svg
+            class="w-5 h-5 sm:w-4 sm:h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-1.414a2 2 0 01.586-1.414z"
+            />
+          </svg>
+        </a>
+
+        <div
+          class="p-2.5 sm:p-2 rounded-xl text-stone-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+          title="Supprimer"
+        >
+          <DeleteButton type="person" id={p._id} />
+        </div>
+      </>
+    ) : (
+      <a
+        href={`/change-requests/new-person?personId=${p._id}`}
+        class="p-2.5 sm:p-2 rounded-xl text-stone-500 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+        title="Proposer une modification"
+      >
+        <svg
+          class="w-5 h-5 sm:w-4 sm:h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+          />
+        </svg>
+      </a>
+    )}
   </div>
-</div>
+
+      </div>
       ))}
     </div>
 
