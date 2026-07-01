@@ -1106,6 +1106,13 @@
   dependencies:
     undici-types "~7.18.0"
 
+"@types/nodemailer@^8.0.0":
+  version "8.0.0"
+  resolved "https://registry.yarnpkg.com/@types/nodemailer/-/nodemailer-8.0.0.tgz#ea189a9c151c04cc65c8a2a4c668c65d952a24e2"
+  integrity sha512-fyf8jWULsCo0d0BuoQ75i6IeoHs47qcqxWc7yUdUcV0pOZGjUTTOvwdG1PRXUDqN/8A64yQdQdnA2pZgcdi+cA==
+  dependencies:
+    "@types/node" "*"
+
 "@types/unist@*", "@types/unist@^3.0.0":
   version "3.0.3"
   resolved "https://registry.npmjs.org/@types/unist/-/unist-3.0.3.tgz"
@@ -3278,6 +3285,11 @@ node-mock-http@^1.0.4:
   resolved "https://registry.npmjs.org/node-mock-http/-/node-mock-http-1.0.4.tgz"
   integrity sha512-8DY+kFsDkNXy1sJglUfuODx1/opAGJGyrTuFqEoN90oRc2Vk0ZbD4K2qmKXBBEhZQzdKHIVfEJpDU8Ak2NJEvQ==
 
+nodemailer@^8.0.10:
+  version "8.0.10"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-8.0.10.tgz#009d4deaa06f54b6bd7ddc6cac1bf78e3bcb0bf2"
+  integrity sha512-BLFuSth7QtHOkBzyqTehWWyub0NTRDuK2Q2SQfnGLsrJnzyU+Yeh4WpV1eZGuARFj1xQJHIdnTuJZLP+b9R1GQ==
+
 nopt@^8.0.0:
   version "8.1.0"
   resolved "https://registry.npmjs.org/nopt/-/nopt-8.1.0.tgz"
@@ -3971,6 +3983,7 @@ std-env@^4.0.0-rc.1:
   integrity sha512-Rq7ybcX2RuC55r9oaPVEW7/xu3tj8u4GeBYHBWCychFtzMIr86A7e3PPEBPT37sHStKX3+TiX/Fr/ACmJLVlLQ==
 
 "string-width-cjs@npm:string-width@^4.2.0", string-width@^4.1.0:
+  name string-width-cjs
   version "4.2.3"
   resolved "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz"
   integrity sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==
@@ -4006,6 +4019,7 @@ stringify-entities@^4.0.0:
     character-entities-legacy "^3.0.0"
 
 "strip-ansi-cjs@npm:strip-ansi@^6.0.1", strip-ansi@^6.0.0, strip-ansi@^6.0.1:
+  name strip-ansi-cjs
   version "6.0.1"
   resolved "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz"
   integrity sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==
