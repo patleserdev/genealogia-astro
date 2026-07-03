@@ -120,7 +120,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     accessRows.push({
       userId: invitedUser._id,
       personId,
-      role: "reader",
+      role: "viewer",
       source: "inherit",
       createdAt: new Date(),
       updatedAt: new Date(),
