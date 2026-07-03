@@ -185,175 +185,183 @@ if (!token) return Astro.redirect("/");
     </div>
   </div>
 
-  <script>
-    const form = document.getElementById("form");
-    const token = form?.dataset.token;
-    const inviteToken = token; // ✅ FIX IMPORTANT
+ <script>
+  const form = document.getElementById("form") as HTMLFormElement | null;
+  if (!form) throw new Error("Formulaire introuvable");
 
-    const res = await fetch(`/api/invitations/validate?token=${token}`);
+  const token = form.dataset.token ?? "";
+  const inviteToken = token;
 
-    if (!res.ok) {
-      document.body.innerHTML = `
-        <div class="h-screen flex items-center justify-center text-stone-600">
-          Invitation invalide ou expirée
-        </div>
-      `;
-      throw new Error();
-    }
+  const res = await fetch(`/api/invitations/validate?token=${token}`);
 
-    const invitation = await res.json();
-    const emailInput = document.getElementById("email");
+  if (!res.ok) {
+    document.body.innerHTML = `
+      <div class="h-screen flex items-center justify-center text-stone-600">
+        Invitation invalide ou expirée
+      </div>
+    `;
+    throw new Error("Invitation invalide");
+  }
 
-    emailInput.value = invitation.toEmail ?? "";
-    emailInput.readOnly = true;
+  const invitation = await res.json();
+  const emailInput = document.getElementById("email") as HTMLInputElement;
 
-    /* RULES */
-    const RULES = {
-      length: (v) => v.length >= 8,
-      upper: (v) => /[A-Z]/.test(v),
-      lower: (v) => /[a-z]/.test(v),
-      number: (v) => /[0-9]/.test(v),
-    };
+  emailInput.value = invitation.toEmail ?? "";
+  emailInput.readOnly = true;
 
-    const password = document.getElementById("password");
-    const confirm = document.getElementById("confirm");
-    const matchMsg = document.getElementById("matchMsg");
+  /* RULES */
+  const RULES: Record<string, (v: string) => boolean> = {
+    length: (v) => v.length >= 8,
+    upper: (v) => /[A-Z]/.test(v),
+    lower: (v) => /[a-z]/.test(v),
+    number: (v) => /[0-9]/.test(v),
+  };
 
-    /* TOGGLE VISIBILITÉ MOT DE PASSE */
-    function setupToggle(inputEl, btnId, eyeId) {
-      const btn = document.getElementById(btnId);
-      const eye = document.getElementById(eyeId);
+  const password = document.getElementById("password") as HTMLInputElement;
+  const confirm = document.getElementById("confirm") as HTMLInputElement;
+  const matchMsg = document.getElementById("matchMsg") as HTMLElement;
 
-      const eyeOpenPath = `
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-      d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  `;
+  /* TOGGLE VISIBILITÉ MOT DE PASSE */
+  function setupToggle(inputEl: HTMLInputElement, btnId: string, eyeId: string) {
+    const btn = document.getElementById(btnId) as HTMLButtonElement | null;
+    const eye = document.getElementById(eyeId) as SVGElement | null;
+    if (!btn || !eye) return;
 
-      const eyeClosedPath = `
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-      d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-  `;
+    const eyeOpenPath = `
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+        d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    `;
 
-      btn.addEventListener("click", () => {
-        const isPassword = inputEl.type === "password";
-        inputEl.type = isPassword ? "text" : "password";
-        eye.innerHTML = isPassword ? eyeClosedPath : eyeOpenPath;
-      });
-    }
+    const eyeClosedPath = `
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+        d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+    `;
 
-    setupToggle(password, "togglePassword", "eyePassword");
-    setupToggle(confirm, "toggleConfirm", "eyeConfirm");
+    btn.addEventListener("click", () => {
+      const isPassword = inputEl.type === "password";
+      inputEl.type = isPassword ? "text" : "password";
+      eye.innerHTML = isPassword ? eyeClosedPath : eyeOpenPath;
+    });
+  }
 
-    function checkRules(v) {
-      return Object.keys(RULES).filter((r) => RULES[r](v)).length;
-    }
+  setupToggle(password, "togglePassword", "eyePassword");
+  setupToggle(confirm, "toggleConfirm", "eyeConfirm");
 
-    password.addEventListener("input", () => {
-      const val = password.value;
-      const score = checkRules(val);
+  function checkRules(v: string): number {
+    return Object.keys(RULES).filter((r) => RULES[r](v)).length;
+  }
 
-      document.querySelectorAll("[data-rule]").forEach((el) => {
-        const ok = RULES[el.dataset.rule](val);
-        el.classList.toggle("text-green-600", ok);
-      });
+  password.addEventListener("input", () => {
+    const val = password.value;
+    const score = checkRules(val);
 
-      const bars = document.querySelectorAll(".bar");
-      bars.forEach((b, i) => {
-        b.className = "bar " + (i < score ? "bg-green-400" : "bg-stone-100");
-      });
+    document.querySelectorAll<HTMLElement>("[data-rule]").forEach((el) => {
+      const rule = el.dataset.rule;
+      if (!rule) return;
+      const ok = RULES[rule](val);
+      el.classList.toggle("text-green-600", ok);
     });
 
-    confirm.addEventListener("input", () => {
-      const ok = password.value === confirm.value;
-      matchMsg.textContent = ok ? "✓ OK" : "✗ différent";
-      matchMsg.classList.remove("hidden");
-      matchMsg.className = ok
-        ? "text-green-600 text-xs"
-        : "text-red-500 text-xs";
+    const bars = document.querySelectorAll<HTMLElement>(".bar");
+    bars.forEach((b, i) => {
+      b.className = "bar " + (i < score ? "bg-green-400" : "bg-stone-100");
     });
+  });
 
-    /* SEARCH FIX */
-    const search = document.getElementById("search");
-    const results = document.getElementById("results");
+  confirm.addEventListener("input", () => {
+    const ok = password.value === confirm.value;
+    matchMsg.textContent = ok ? "✓ OK" : "✗ différent";
+    matchMsg.classList.remove("hidden");
+    matchMsg.className = ok
+      ? "text-green-600 text-xs"
+      : "text-red-500 text-xs";
+  });
 
-    let t;
+  /* SEARCH */
+  const search = document.getElementById("search") as HTMLInputElement;
+  const results = document.getElementById("results") as HTMLUListElement;
+  const personId = document.getElementById("personId") as HTMLInputElement;
 
-    search.addEventListener("input", () => {
-      clearTimeout(t);
-      const q = search.value.trim();
-      if (q.length < 2) return (results.innerHTML = "");
+  let t: ReturnType<typeof setTimeout>;
 
-      t = setTimeout(async () => {
-        const url = new URL(
-          `/api/persons/search?q=${q}&inviteToken=${token}`,
-          window.location.origin,
-        );
-        url.searchParams.set("q", q);
-        url.searchParams.set("inviteToken", inviteToken); // ✅ FIX CRUCIAL
-
-        const data = await fetch(url).then((r) => r.json());
-
-        results.innerHTML = data
-          .map(
-            (p) => `
-              <li data-id="${p._id}" class="px-3 py-2 hover:bg-amber-50 cursor-pointer">
-                ${p.prenom} ${p.nom}
-              </li>`,
-          )
-          .join("");
-      }, 300);
-    });
-
-    results.addEventListener("click", (e) => {
-      const li = e.target.closest("li");
-      if (!li) return;
-
-      document.getElementById("personId").value = li.dataset.id;
-      search.value = li.textContent;
+  search.addEventListener("input", () => {
+    clearTimeout(t);
+    const q = search.value.trim();
+    if (q.length < 2) {
       results.innerHTML = "";
+      return;
+    }
+
+    t = setTimeout(async () => {
+      const url = new URL("/api/persons/search", window.location.origin);
+      url.searchParams.set("q", q);
+      url.searchParams.set("inviteToken", inviteToken);
+
+      const data: { _id: string; prenom: string; nom: string }[] =
+        await fetch(url).then((r) => r.json());
+
+      results.innerHTML = data
+        .map(
+          (p) => `
+            <li data-id="${p._id}" class="px-3 py-2 hover:bg-amber-50 cursor-pointer">
+              ${p.prenom} ${p.nom}
+            </li>`,
+        )
+        .join("");
+    }, 300);
+  });
+
+  results.addEventListener("click", (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    const li = target?.closest("li") as HTMLElement | null;
+    if (!li) return;
+
+    personId.value = li.dataset.id ?? "";
+    search.value = li.textContent ?? "";
+    results.innerHTML = "";
+  });
+
+  /* SUBMIT */
+  const errorEl = document.getElementById("error") as HTMLElement;
+  const btn = document.getElementById("btn") as HTMLButtonElement;
+
+  form.addEventListener("submit", async (e: SubmitEvent) => {
+    e.preventDefault();
+
+    if (checkRules(password.value) < 4) {
+      errorEl.textContent = "Mot de passe trop faible";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    if (password.value !== confirm.value) {
+      errorEl.textContent = "Les mots de passe ne correspondent pas";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Création...";
+
+    const data = Object.fromEntries(new FormData(form));
+
+    const submitRes = await fetch("/api/invitations/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
     });
 
-    /* SUBMIT */
-    document.getElementById("form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const error = document.getElementById("error");
-      const btn = document.getElementById("btn");
-
-      if (checkRules(password.value) < 4) {
-        error.textContent = "Mot de passe trop faible";
-        error.classList.remove("hidden");
-        return;
-      }
-
-      if (password.value !== confirm.value) {
-        error.textContent = "Les mots de passe ne correspondent pas";
-        error.classList.remove("hidden");
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = "Création...";
-
-      const data = Object.fromEntries(new FormData(e.target));
-
-      const res = await fetch("/api/invitations/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (res.ok) {
-        window.location.href = "/login";
-      } else {
-        const { error: err } = await res.json();
-        error.textContent = err;
-        error.classList.remove("hidden");
-        btn.disabled = false;
-        btn.textContent = "Créer mon compte";
-      }
-    });
-  </script>
+    if (submitRes.ok) {
+      window.location.href = "/login";
+    } else {
+      const { error: err } = await submitRes.json();
+      errorEl.textContent = err;
+      errorEl.classList.remove("hidden");
+      btn.disabled = false;
+      btn.textContent = "Créer mon compte";
+    }
+  });
+</script>
 </Baselayout>
