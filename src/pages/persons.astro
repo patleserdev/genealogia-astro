@@ -16,6 +16,8 @@ try {
   return Astro.redirect('/login')
 }
 
+
+
 function calcAge(from: Date, to: Date) {
   let years  = to.getFullYear() - from.getFullYear();
   let months = to.getMonth() - from.getMonth();
@@ -54,6 +56,7 @@ function getGeneration(year: number): { label: string; color: string } | null {
       active: true,
       _id: { $in: personIds }
     }).toArray();
+
     const isOwner = payload.role === 'OWNER'
 
     const personsList = data
@@ -230,7 +233,7 @@ function getGeneration(year: number): { label: string; color: string } | null {
           )
         )}
 
-        {p.email && !p.dateDeces && (
+        {isOwner && p.email && !p.dateDeces && (
           <div class="truncate">
             <span class="text-stone-400">Email :</span> {p.email}
           </div>

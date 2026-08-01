@@ -366,10 +366,10 @@ const filteredTimeline = personBirthDate
                 {person.sexe === 'M' ? 'Homme' : person.sexe === 'F' ? 'Femme' : person.sexe ?? '—'}
               </p>
             </div>
-            <div>
+            {isOwner && <div>
               <p class="text-xs text-stone-400 mb-0.5">Email</p>
               <p class="text-sm font-medium text-stone-800 truncate">{person.email ?? '—'}</p>
-            </div>
+            </div}
           </div>
 
           {person.notes && (

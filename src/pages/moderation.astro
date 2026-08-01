@@ -48,9 +48,7 @@ const rawMine = await changeRequests.aggregate([
   { $lookup: { from: 'users',   localField: 'ownerId',   foreignField: '_id', as: 'ownerUser' } },
   { $lookup: { from: 'persons', localField: 'personId',  foreignField: '_id', as: 'targetPerson' } },
 ]).toArray()
-console.log("payload.userId", payload.userId)
-console.log("rawOwner", rawOwner.length)
-console.log("rawMine", rawMine.length)
+
 
 const isOwner  = rawOwner.length > 0
 const isGuest  = rawMine.length  > 0
