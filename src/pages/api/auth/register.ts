@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro'
 import bcrypt from 'bcryptjs'
 import { ObjectId } from 'mongodb'
 import { db } from '../../../lib/mongo'
+import { emailService } from '../../../services/email/email.service.ts'
 
 const PASSWORD_REGEX =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
@@ -151,6 +152,17 @@ export const POST: APIRoute = async ({ request }) => {
     password: hashed,
     personId: linkedPersonId,
     createdAt: new Date(),
+  })
+
+  try {
+    await emailService.sendWelcome(email, prenom)
+  } catch (err) {
+    console.error('Échec envoi mail de bienvenue:', err)
+    // on ne bloque pas la création du compte si le mail échoue
+  }
+  
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 201,
   })
 
   return new Response(JSON.stringify({ ok: true }), {

@@ -9,6 +9,7 @@ import { invitationTemplate } from "./templates/invitation";
 import { passwordChangedTemplate } from "./templates/password-changed";
 import { accountApprovedTemplate } from "./templates/account-approved";
 import { moderationNotificationTemplate } from "./templates/moderation-notification";
+import { invitationAcceptedTemplate } from "./templates/invitation-accepted.ts";
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST ?? "localhost",
@@ -61,6 +62,18 @@ export class EmailService {
     );
   }
 
+  async sendInvitationAccepted(
+    email: string,
+    guestName: string
+  ) {
+    return this.send(
+      email,
+      "Invitation acceptée",
+      invitationAcceptedTemplate(guestName)
+    );
+  }
+
+
   /**
    * Bienvenue
    */
@@ -76,7 +89,7 @@ export class EmailService {
   }
 
   /**
-   * Invitation familiale
+   * Invitation familiale - intégré
    */
   async sendInvitation(
     email: string,

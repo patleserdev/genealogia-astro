@@ -4,6 +4,9 @@ import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import { db, invitations, user_persons, users } from "../../../lib/mongo";
 import { createToken } from "../../../lib/auth";
+import { emailService } from "../../../services/email/email.service";
+
+export const prerender = false;
 
 const PASSWORD_REGEX =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -147,6 +150,26 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
+
+    // 📧 Mail de bienvenue au nouveau guest (non bloquant)
+    try {
+      await emailService.sendWelcome(inv.toEmail, prenom.trim());
+    } catch (err) {
+      console.error("Échec envoi mail de bienvenue:", err);
+    }
+
+    // 📧 Notification à l'owner qui a invité (non bloquant)
+    try {
+      const owner = await users.findOne({ _id: inv.fromUserId });
+      if (owner?.email) {
+        await emailService.sendInvitationAccepted(
+          owner.email,
+          `${prenom.trim()} ${nom.trim()}`
+        );
+      }
+    } catch (err) {
+      console.error("Échec envoi mail notification owner:", err);
+    }
 
     return new Response(JSON.stringify({ ok: true }), { status: 201 });
   } catch (e) {

@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro'
 import bcrypt from 'bcryptjs'
 import { db } from '../../../lib/mongo'
+import { emailService } from '../../../services/email/email.service.ts'
+
 
 export const POST: APIRoute = async ({ request }) => {
   const { token, password } = await request.json()
@@ -41,10 +43,18 @@ export const POST: APIRoute = async ({ request }) => {
     { $set: { password: hashed } }
   )
 
-  await db.collection('passwordResets').updateOne(
+  await db.collection('password_resets').updateOne(
     { _id: reset._id },
     { $set: { used: true } }
   )
+
+  // 👉 Confirmation par mail que le mot de passe a été changé
+  try {
+    await emailService.sendPasswordChanged(user.email)
+  } catch (err) {
+    console.error('Échec envoi mail confirmation changement mot de passe:', err)
+    // on ne bloque pas la réponse si le mail échoue : le reset a déjà eu lieu
+  }
 
   return new Response(JSON.stringify({ ok: true }))
 }

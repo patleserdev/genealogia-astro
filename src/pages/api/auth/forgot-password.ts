@@ -1,10 +1,13 @@
 import type { APIRoute } from 'astro'
 import crypto from 'crypto'
 import { db } from '../../../lib/mongo'
+import { emailService } from '../../../services/email/email.service'
+
+export const prerender = false
 
 export const POST: APIRoute = async ({ request }) => {
   const { email } = await request.json()
-  console.log('🔥 forgot-password HIT')
+
   if (!email?.trim()) {
     return new Response(JSON.stringify({ error: 'Email requis' }), { status: 400 })
   }
@@ -12,7 +15,6 @@ export const POST: APIRoute = async ({ request }) => {
   const normalizedEmail = email.toLowerCase().trim()
 
   const user = await db.collection('users').findOne({ email: normalizedEmail })
-  //console.log('2 - user', user)
 
   // ⚠️ sécurité: ne pas révéler si user existe ou non
   if (!user) {
@@ -21,8 +23,6 @@ export const POST: APIRoute = async ({ request }) => {
 
   // ── Génération token reset ──
   const resetToken = crypto.randomBytes(32).toString('hex')
-  //console.log('3 - token generated',resetToken)
-
   const expiresAt = new Date(Date.now() + 1000 * 60 * 30) // 30 min
 
   await db.collection('password_resets').insertOne({
@@ -33,12 +33,15 @@ export const POST: APIRoute = async ({ request }) => {
     used: false,
     createdAt: new Date(),
   })
-  //console.log('4 - inserted')
 
-  // ── TODO: envoyer email ──
-  // ex: /reset-password?token=xxx
   const resetLink = `${import.meta.env.PUBLIC_APP_URL}/reset-password?token=${resetToken}`
 
-  console.log('5 - link', resetLink)
+  try {
+    await emailService.sendPasswordReset(normalizedEmail, resetLink)
+  } catch (err) {
+    console.error('Échec envoi mail reset password:', err)
+    // On ne révèle rien au client, l'erreur est juste loggée côté serveur
+  }
+
   return new Response(JSON.stringify({ ok: true }))
 }

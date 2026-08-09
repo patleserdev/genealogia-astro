@@ -17,12 +17,19 @@ vi.mock("../../../lib/mongo.ts", () => ({
   },
 }))
 
+vi.mock("../../../lib/auth", () => ({
+  verifyToken: vi.fn(() => ({ userId: "owner-id", role: "OWNER" })),
+}))
+
 import { DELETE } from "./[id]"
 import { persons, user_persons, relations, changeRequests } from "../../../lib/mongo.ts"
 
 function mockContext(id: string) {
   return {
     params: { id },
+    cookies: {
+      get: vi.fn().mockReturnValue({ value: "fake-jwt-token" }),
+    },
   } as any
 }
 
@@ -34,7 +41,6 @@ describe("DELETE /api/persons/:id", () => {
   })
 
   it("supprime une personne + relations + user_persons + changeRequests", async () => {
-    // mock delete personne OK
     ;(persons.deleteOne as any).mockResolvedValue({ deletedCount: 1 })
 
     const res = await DELETE(mockContext(id))

@@ -62,7 +62,7 @@ export const onRequest = defineMiddleware(async ({ request, cookies, redirect },
     const user = await db.collection("users").findOne({
       _id: new ObjectId(payload.userId),
     });
-
+    console.log('🔍 Recherche user avec userId:', payload.userId, '→ trouvé:', !!user);
     if (!user) {
       cookies.delete("token", { path: "/" });
       return redirect("/login");
@@ -70,7 +70,9 @@ export const onRequest = defineMiddleware(async ({ request, cookies, redirect },
 
     // optionnel : inject user
     (request as any).user = user;
-  } catch {
+  } catch(err) {
+    console.error('❌ Middleware auth error:', err);
+
     cookies.delete("token", { path: "/" });
     return redirect("/login");
   }

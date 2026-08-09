@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import { ObjectId } from 'mongodb'
 import { invitations, users } from '../../../lib/mongo'
 import { verifyToken } from '../../../lib/auth'
+import { emailService } from '../../../services/email/email.service'
 
 export const prerender = false
 
@@ -25,32 +26,32 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!email?.trim())
     return new Response(JSON.stringify({ error: 'Email requis' }), { status: 400 })
 
-  
   const normalizedEmail = email.toLowerCase().trim()
 
   const safeShared = Array.isArray(sharedPersonIds)
-  ? sharedPersonIds.map(id => new ObjectId(id))
-  : []
+    ? sharedPersonIds.map(id => new ObjectId(id))
+    : []
 
   const fromUserId = new ObjectId(payload.userId)
+
+  // On récupère l'owner pour avoir son nom dans le mail
+  const owner = await users.findOne({ _id: fromUserId })
+  const inviterName = owner ? `${owner.prenom} ${owner.nom}` : 'Un membre de votre famille'
 
   // ── Cas 1 : l'user existe déjà ──────────────────────────
   const existingUser = await users.findOne({ email: normalizedEmail })
 
   if (existingUser) {
-    // Déjà guest de cet owner ?
     if (existingUser.invitedBy?.toString() === payload.userId)
       return new Response(JSON.stringify({
         error: 'Cet utilisateur a déjà accès à votre arbre'
       }), { status: 400 })
 
-    // Déjà guest de quelqu'un d'autre → on refuse
     if (existingUser.invitedBy)
       return new Response(JSON.stringify({
         error: 'Cet utilisateur est déjà rattaché à un autre arbre'
       }), { status: 400 })
 
-    // Lien direct sans invitation
     await users.updateOne(
       { _id: existingUser._id },
       { $set: { role: 'GUEST', invitedBy: fromUserId } }
@@ -81,11 +82,21 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     status:    'PENDING',
     createdAt: new Date(),
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    sharedPersonIds: safeShared, // 👈 IMPORTANT
-
+    sharedPersonIds: safeShared,
   })
 
   const created = await invitations.findOne({ _id: inv.insertedId })
+
+  // 👉 Construction du lien complet et envoi du mail
+  const invitationLink = `${process.env.PUBLIC_APP_URL ?? 'http://localhost:4321'}/invite?token=${created!.token}`
+
+  try {
+    await emailService.sendInvitation(normalizedEmail, inviterName, invitationLink)
+  } catch (err) {
+    console.error('Échec envoi mail invitation:', err)
+    // On ne bloque pas la création de l'invitation si le mail échoue
+    // (elle existe déjà en base, le lien reste valide)
+  }
 
   return new Response(JSON.stringify({
     ok: true,
