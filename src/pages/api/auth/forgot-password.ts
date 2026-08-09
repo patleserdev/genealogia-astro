@@ -36,6 +36,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   const resetLink = `${process.env.PUBLIC_APP_URL ?? 'http://localhost:4321'}/reset-password?token=${resetToken}`
   console.log('DEBUG PUBLIC_APP_URL:', process.env.PUBLIC_APP_URL, import.meta.env.PUBLIC_APP_URL)
+  
   try {
     await emailService.sendPasswordReset(normalizedEmail, resetLink)
   } catch (err) {
