@@ -11,19 +11,29 @@ import { accountApprovedTemplate } from "./templates/account-approved";
 import { moderationNotificationTemplate } from "./templates/moderation-notification";
 import { invitationAcceptedTemplate } from "./templates/invitation-accepted.ts";
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST ?? "localhost",
-  port: Number(process.env.SMTP_PORT ?? 1025),
-  secure: true,
-  auth: process.env.SMTP_USER
-    ? {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      }
-    : undefined, // pas d'auth en local (Mailhog/Maildev)
-    logger: true,
-  debug: true,
-});
+let transporter: nodemailer.Transporter | null = null;
+
+
+function getTransporter() {
+  if (!transporter) {
+    const port = Number(process.env.SMTP_PORT ?? 1025);
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    console.log('SMTP_USER length:', process.env.SMTP_USER?.length ?? 'undefined');
+    console.log('SMTP_PASS length:', process.env.SMTP_PASS?.length ?? 'undefined');
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST ?? "localhost",
+      port,
+      secure: port === 465,
+      auth: user && pass ? { user, pass } : undefined,
+      logger: true,
+      debug: true,
+    });
+  }
+  return transporter;
+}
+
+
 
 export class EmailService {
   private readonly from =
@@ -34,7 +44,7 @@ export class EmailService {
     subject: string,
     html: string
   ) {
-    await transporter.sendMail({
+    await getTransporter().sendMail({
       from: this.from,
       to,
       subject,
