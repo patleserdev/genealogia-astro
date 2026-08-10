@@ -53,10 +53,13 @@ const rawMine = await changeRequests.aggregate([
 const isOwner  = rawOwner.length > 0
 const isGuest  = rawMine.length  > 0
 
-const one = await changeRequests.findOne({})
-console.log("TYPE requestedByUserId:", typeof one?.requestedByUserId)
-console.log("VALUE:", one?.requestedByUserId)
-console.log("instanceof ObjectId:", one?.requestedByUserId instanceof ObjectId)
+//const one = await changeRequests.findOne({})
+//console.log("TYPE requestedByUserId:", typeof one?.requestedByUserId)
+//console.log("VALUE:", one?.requestedByUserId)
+//console.log("instanceof ObjectId:", one?.requestedByUserId instanceof ObjectId)
+
+const one = await changeRequests.findOne({ _id: new ObjectId("6a786c4abc8de0f1e084e777") })
+console.log("ownerId type:", typeof one?.ownerId, one?.ownerId instanceof ObjectId)
 
 function mapRequest(r: any) {
   return {
@@ -71,6 +74,8 @@ function mapRequest(r: any) {
     ownerName:    r.ownerUser?.[0]  ? `${r.ownerUser[0].prenom} ${r.ownerUser[0].nom}` : 'Inconnu',
   }
 }
+console.log("rawOwner.length:", rawOwner.length)
+console.log("rawMine.length:", rawMine.length)
 
 const ownerRequests = rawOwner.map(mapRequest)
 const myRequests    = rawMine.map(mapRequest)

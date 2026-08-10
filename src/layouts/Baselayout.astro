@@ -25,6 +25,8 @@ if (isOwner) {
   });
 }
 
+console.log("pendingModerationCount",pendingModerationCount)
+
 const registrationEnabled = import.meta.env.DEMO_MODE !== "false";
 let unreadNotifications = 0;
 
@@ -33,7 +35,7 @@ if (payload?.userId) {
     userId: new ObjectId(payload.userId),
     read: false,
   });
-  console.log(unreadNotifications)
+  console.log("ununreadNotifications",unreadNotifications)
 }
 
 const nav = [
@@ -47,6 +49,7 @@ const nav = [
     ownerOnly: false,
     badge: isOwner ? pendingModerationCount:unreadNotifications,
   },
+  
   { href: "/relations/add-quick", label: "Relation rapide", ownerOnly: true },
   {
     href: "/persons/add-with-relations",

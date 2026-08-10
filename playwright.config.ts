@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   globalSetup: './tests/global-setup.ts',
+  globalTeardown: './tests/global-teardown',
+
   testDir: './tests',
   use: {
     baseURL: 'http://localhost:4321',

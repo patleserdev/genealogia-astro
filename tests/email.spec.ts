@@ -1,6 +1,7 @@
 // tests/email.spec.ts
 import { test, expect } from '@playwright/test'
 import { clearMailbox, waitForEmail, getMessages, extractTokenFromLink } from './helpers/mailhog'
+import { changeRequests, users } from '../src/lib/mongo.ts'
 
 const BASE_URL = 'http://localhost:4321'
 
@@ -17,7 +18,7 @@ test.beforeAll(async ({ request }) => {
 
 test.describe('Envoi de mails', () => {
   test.beforeEach(async () => {
-  //  await clearMailbox()
+   await clearMailbox()
   })
 
   test('forgot-password envoie un mail de reset', async ({ request }) => {
@@ -64,7 +65,7 @@ test.describe('Envoi de mails', () => {
     const resetEmail = await waitForEmail(email, 'Réinitialisation')
     const token = extractTokenFromLink(resetEmail.html, 'token')
   
-   // await clearMailbox()
+   await clearMailbox()
   
     // 2. Effectue le reset avec le vrai token et un mot de passe garanti différent
     const resetRes = await request.post(`${BASE_URL}/api/auth/reset-password`, {
@@ -167,7 +168,7 @@ test.describe('Envoi de mails', () => {
     const invitationEmail = await waitForEmail(guestEmail, 'Invitation')
     const invitationToken = extractTokenFromLink(invitationEmail.html, 'token')
   
-    //await clearMailbox() // isole les mails déclenchés par l'acceptation
+    await clearMailbox() // isole les mails déclenchés par l'acceptation
   
     // 3. Accepte l'invitation → crée le compte GUEST
     const acceptRes = await request.post(`${BASE_URL}/api/invitations/accept`, {
@@ -190,5 +191,10 @@ test.describe('Envoi de mails', () => {
     const notificationMessage = await waitForEmail(ownerEmail, 'Invitation acceptée')
     expect(notificationMessage.subject).toContain('Invitation acceptée')
     expect(notificationMessage.html).toContain('Marie Curie')
+  })
+
+  test.afterAll(async () => {
+    await changeRequests.deleteMany({ 'proposedData.nom': 'Person' })
+    await users.deleteMany({ email: { $regex: /^(testuser|newuser-|guest-accept-|invite-)/ } })
   })
 })
