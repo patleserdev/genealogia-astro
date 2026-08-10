@@ -14,7 +14,7 @@ import { invitationAcceptedTemplate } from "./templates/invitation-accepted.ts";
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST ?? "localhost",
   port: Number(process.env.SMTP_PORT ?? 1025),
-  secure: false,
+  secure: true,
 });
 
 export class EmailService {
