@@ -18,9 +18,8 @@ function getTransporter() {
   if (!transporter) {
     const port = Number(process.env.SMTP_PORT ?? 1025);
     const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    console.log('SMTP_USER length:', process.env.SMTP_USER?.length ?? 'undefined');
-    console.log('SMTP_PASS length:', process.env.SMTP_PASS?.length ?? 'undefined');
+    const pass = process.env.SMTP_PASSWORD;
+
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST ?? "localhost",
       port,
